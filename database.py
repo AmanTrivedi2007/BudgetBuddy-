@@ -2,12 +2,29 @@
 import sqlite3
 import pandas as pd
 from datetime import datetime
+import os
 
 # Database file name
 DB_FILE = "budgetbuddy.db"
 
 def init_database():
-    """Initialize database and create tables if they don't exist"""
+    """Initialize database - auto-deletes old database without user_id"""
+    
+    # Delete old database if it doesn't have user_id column
+    if os.path.exists(DB_FILE):
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(income)")
+            columns = [col[1] for col in cursor.fetchall()]
+            conn.close()
+            
+            if 'user_id' not in columns:
+                os.remove(DB_FILE)
+        except:
+            pass
+    
+    # Create tables
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
