@@ -1,3 +1,4 @@
+# Saving_goal.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -6,13 +7,16 @@ from database import (get_all_income, get_all_expenses, get_all_goals,
 
 st.title("🎯 Saving Goals Tracker")
 
-# Load data from database instead of session state
-income_list = get_all_income()
-expense_list = get_all_expenses()
+# Get current logged-in user
+user_id = st.session_state.username
+
+# Load data from database with user_id
+income_list = get_all_income(user_id)
+expense_list = get_all_expenses(user_id)
 
 # Initialize session state for goals if not exists, otherwise load from database
 if 'goals_loaded' not in st.session_state:
-    st.session_state.goals_list = get_all_goals()
+    st.session_state.goals_list = get_all_goals(user_id)
     st.session_state.goals_loaded = True
 
 # Calculate financial summary (using database data)
@@ -56,11 +60,12 @@ with col_left:
             if goal_name in existing_names:
                 st.error("❌ Goal with this name already exists!")
             else:
-                # Save to database
-                if add_goal_to_db(goal_name, goal_target, goal_description):
+                # Save to database WITH user_id
+                if add_goal_to_db(user_id, goal_name, goal_target, goal_description):
                     # Reload from database to sync
-                    st.session_state.goals_list = get_all_goals()
+                    st.session_state.goals_list = get_all_goals(user_id)
                     st.success(f"✅ Goal '{goal_name}' created successfully!")
+                    st.balloons()
                     st.rerun()
                 else:
                     st.error("❌ Goal with this name already exists!")
@@ -85,11 +90,11 @@ with col_right:
                 if add_amount > available_balance:
                     st.error(f"❌ Insufficient balance! Available: ₹{available_balance:,.2f}")
                 else:
-                    # Save to database
-                    add_money_to_goal(selected_goal_name, add_amount, add_note)
+                    # Save to database WITH user_id
+                    add_money_to_goal(user_id, selected_goal_name, add_amount, add_note)
                     
                     # Reload from database to sync
-                    st.session_state.goals_list = get_all_goals()
+                    st.session_state.goals_list = get_all_goals(user_id)
                     
                     st.success(f"✅ Added ₹{add_amount:,.2f} to '{selected_goal_name}'!")
                     st.rerun()
@@ -147,15 +152,17 @@ if st.session_state.goals_list:
                 if progress >= 100:
                     if st.button(f"✅ Mark Complete", key=f"complete_{idx}"):
                         st.success(f"🎉 Congratulations! You achieved '{goal['name']}'!")
+                        st.balloons()
             
             with col_btn3:
                 # Delete goal
                 if st.button(f"🗑️ Delete Goal", key=f"delete_{idx}"):
-                    # Delete from database
-                    delete_goal_from_db(goal['name'])
+                    # Delete from database WITH user_id
+                    delete_goal_from_db(user_id, goal['name'])
                     
                     # Reload from database to sync
-                    st.session_state.goals_list = get_all_goals()
+                    st.session_state.goals_list = get_all_goals(user_id)
+                    st.success(f"Deleted goal '{goal['name']}'")
                     st.rerun()
             
             # Withdraw money form (appears when withdraw button clicked)
@@ -175,11 +182,11 @@ if st.session_state.goals_list:
                     with col_w1:
                         if st.form_submit_button("Confirm Withdraw"):
                             if withdraw_amount > 0:
-                                # Save to database
-                                withdraw_from_goal(goal['name'], withdraw_amount, withdraw_note)
+                                # Save to database WITH user_id
+                                withdraw_from_goal(user_id, goal['name'], withdraw_amount, withdraw_note)
                                 
                                 # Reload from database to sync
-                                st.session_state.goals_list = get_all_goals()
+                                st.session_state.goals_list = get_all_goals(user_id)
                                 
                                 st.success(f"✅ Withdrew ₹{withdraw_amount:,.2f}")
                                 st.session_state[f'withdraw_mode_{idx}'] = False
@@ -246,6 +253,6 @@ if st.session_state.goals_list:
     st.download_button(
         label="📥 Download Goals Report",
         data=csv,
-        file_name=f"saving_goals_{datetime.now().date()}.csv",
+        file_name=f"saving_goals_{user_id}_{datetime.now().date()}.csv",
         mime='text/csv',
     )
