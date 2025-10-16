@@ -1,20 +1,23 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from database import (get_all_income, get_all_expenses, get_all_goals, 
+                      add_goal_to_db, add_money_to_goal, withdraw_from_goal, delete_goal_from_db)
 
 st.title("🎯 Saving Goals Tracker")
 
-# Initialize session states
-if 'income_list' not in st.session_state:
-    st.session_state.income_list = []
-if 'expense_list' not in st.session_state:
-    st.session_state.expense_list = []
-if 'goals_list' not in st.session_state:
-    st.session_state.goals_list = []
+# Load data from database instead of session state
+income_list = get_all_income()
+expense_list = get_all_expenses()
 
-# Calculate financial summary
-total_income = sum(item['amount'] for item in st.session_state.income_list)
-total_expense = sum(item['amount'] for item in st.session_state.expense_list)
+# Initialize session state for goals if not exists, otherwise load from database
+if 'goals_loaded' not in st.session_state:
+    st.session_state.goals_list = get_all_goals()
+    st.session_state.goals_loaded = True
+
+# Calculate financial summary (using database data)
+total_income = sum(item['amount'] for item in income_list)
+total_expense = sum(item['amount'] for item in expense_list)
 total_saved_in_goals = sum(goal['saved_amount'] for goal in st.session_state.goals_list)
 available_balance = total_income - total_expense - total_saved_in_goals
 
@@ -53,17 +56,14 @@ with col_left:
             if goal_name in existing_names:
                 st.error("❌ Goal with this name already exists!")
             else:
-                new_goal = {
-                    'name': goal_name,
-                    'target_amount': goal_target,
-                    'saved_amount': 0.0,
-                    'description': goal_description,
-                    'created_date': str(datetime.now().date()),
-                    'transactions': []  # Store all money additions
-                }
-                st.session_state.goals_list.append(new_goal)
-                st.success(f"✅ Goal '{goal_name}' created successfully!")
-                st.rerun()
+                # Save to database
+                if add_goal_to_db(goal_name, goal_target, goal_description):
+                    # Reload from database to sync
+                    st.session_state.goals_list = get_all_goals()
+                    st.success(f"✅ Goal '{goal_name}' created successfully!")
+                    st.rerun()
+                else:
+                    st.error("❌ Goal with this name already exists!")
 
 # RIGHT COLUMN - Add Money to Existing Goal
 with col_right:
@@ -85,21 +85,14 @@ with col_right:
                 if add_amount > available_balance:
                     st.error(f"❌ Insufficient balance! Available: ₹{available_balance:,.2f}")
                 else:
-                    # Find the goal and add money
-                    for goal in st.session_state.goals_list:
-                        if goal['name'] == selected_goal_name:
-                            goal['saved_amount'] += add_amount
-                            
-                            # Record transaction
-                            transaction = {
-                                'amount': add_amount,
-                                'date': str(datetime.now().date()),
-                                'note': add_note
-                            }
-                            goal['transactions'].append(transaction)
-                            
-                            st.success(f"✅ Added ₹{add_amount:,.2f} to '{selected_goal_name}'!")
-                            st.rerun()
+                    # Save to database
+                    add_money_to_goal(selected_goal_name, add_amount, add_note)
+                    
+                    # Reload from database to sync
+                    st.session_state.goals_list = get_all_goals()
+                    
+                    st.success(f"✅ Added ₹{add_amount:,.2f} to '{selected_goal_name}'!")
+                    st.rerun()
     else:
         st.info("📝 Create a goal first to add money!")
 
@@ -158,7 +151,11 @@ if st.session_state.goals_list:
             with col_btn3:
                 # Delete goal
                 if st.button(f"🗑️ Delete Goal", key=f"delete_{idx}"):
-                    st.session_state.goals_list.pop(idx)
+                    # Delete from database
+                    delete_goal_from_db(goal['name'])
+                    
+                    # Reload from database to sync
+                    st.session_state.goals_list = get_all_goals()
                     st.rerun()
             
             # Withdraw money form (appears when withdraw button clicked)
@@ -178,15 +175,11 @@ if st.session_state.goals_list:
                     with col_w1:
                         if st.form_submit_button("Confirm Withdraw"):
                             if withdraw_amount > 0:
-                                goal['saved_amount'] -= withdraw_amount
+                                # Save to database
+                                withdraw_from_goal(goal['name'], withdraw_amount, withdraw_note)
                                 
-                                # Record withdrawal
-                                transaction = {
-                                    'amount': -withdraw_amount,
-                                    'date': str(datetime.now().date()),
-                                    'note': f"Withdrawal: {withdraw_note}"
-                                }
-                                goal['transactions'].append(transaction)
+                                # Reload from database to sync
+                                st.session_state.goals_list = get_all_goals()
                                 
                                 st.success(f"✅ Withdrew ₹{withdraw_amount:,.2f}")
                                 st.session_state[f'withdraw_mode_{idx}'] = False
