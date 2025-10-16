@@ -14,7 +14,7 @@ st.set_page_config(
 
 # Define pages
 page1 = st.Page("income_monitoring.py", title="Income Monitoring", icon="💵")
-page2 = st.Page("expense_tracking.py", title="Expense Tracking", icon="💳")
+page2 = st.Page("expense.py", title="Expense Tracking", icon="💳")
 page3 = st.Page("Saving_goal.py", title="Saving Goals", icon="🎯")
 page4 = st.Page("visualization.py", title="Spending Visualization", icon="📊")
 
