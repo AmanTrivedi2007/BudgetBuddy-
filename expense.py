@@ -1,8 +1,8 @@
-# expense_tracking.py
+# expense.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from database import add_expense_to_db, get_all_expenses, get_all_income, delete_expense_from_db
+from database import add_expense_to_db, get_all_expenses, get_all_income, get_all_goals, delete_expense_from_db
 
 st.title("💳 Expense Tracking")
 
@@ -34,24 +34,36 @@ st.markdown("---")
 # Display financial summary
 st.subheader("💰 Financial Summary")
 
+# Load ALL data including goals
 income_list = get_all_income()
 expense_list = get_all_expenses()
+goals_list = get_all_goals()  # ← ADDED THIS LINE
 
+# Calculate totals INCLUDING goals
 total_income = sum(item['amount'] for item in income_list)
 total_expense = sum(item['amount'] for item in expense_list)
-balance = total_income - total_expense
+total_saved_in_goals = sum(goal['saved_amount'] for goal in goals_list)  # ← ADDED THIS LINE
+balance = total_income - total_expense - total_saved_in_goals  # ← FIXED THIS LINE
 
-col1, col2, col3 = st.columns(3)
+# Display metrics with goals included
+col1, col2, col3, col4 = st.columns(4)  # ← CHANGED TO 4 COLUMNS
 
 with col1:
     st.metric("Total Income", f"₹{total_income:,.2f}")
 with col2:
     st.metric("Total Expenses", f"₹{total_expense:,.2f}")
 with col3:
-    st.metric("Balance", f"₹{balance:,.2f}", delta=f"{balance:,.2f}")
+    st.metric("Saved in Goals", f"₹{total_saved_in_goals:,.2f}")  # ← ADDED THIS
+with col4:
+    st.metric("Available Balance", f"₹{balance:,.2f}", delta=f"{balance:,.2f}")
 
+# Warning messages
 if total_expense > total_income:
     st.warning("⚠️ You're spending more than your income!")
+elif balance < 0:
+    st.error("❌ Your expenses + savings exceed your income!")
+elif balance == 0:
+    st.info("ℹ️ You've allocated all your income!")
 
 st.markdown("---")
 
@@ -88,3 +100,4 @@ if expense_list:
             st.rerun()
 else:
     st.info("📝 No expense records yet. Add your first expense above!")
+
