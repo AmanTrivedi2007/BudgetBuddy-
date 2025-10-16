@@ -6,17 +6,20 @@ from database import add_expense_to_db, get_all_expenses, get_all_income, get_al
 
 st.title("💳 Expense Tracking")
 
-# First, load current financial status to show at top
-income_list = get_all_income()
-expense_list = get_all_expenses()
-goals_list = get_all_goals()
+# Get current user
+user_id = st.session_state.username
+
+# Load current financial status to show at top
+income_list = get_all_income(user_id)
+expense_list = get_all_expenses(user_id)
+goals_list = get_all_goals(user_id)
 
 total_income = sum(item['amount'] for item in income_list)
 total_expense = sum(item['amount'] for item in expense_list)
 total_saved_in_goals = sum(goal['saved_amount'] for goal in goals_list)
 available_balance = total_income - total_expense - total_saved_in_goals
 
-# Show balance alert at the top if insufficient
+# Show balance alert at top if insufficient
 if available_balance <= 0:
     st.error(f"⚠️ **No available balance!** Current balance: ₹{available_balance:,.2f}")
     st.warning("💡 Add income first before adding expenses.")
@@ -40,16 +43,16 @@ with st.form("expense_form"):
     
     if submitted and expense_amount > 0:
         # Reload to get latest balance
-        income_list_check = get_all_income()
-        expense_list_check = get_all_expenses()
-        goals_list_check = get_all_goals()
+        income_list_check = get_all_income(user_id)
+        expense_list_check = get_all_expenses(user_id)
+        goals_list_check = get_all_goals(user_id)
         
         total_income_check = sum(item['amount'] for item in income_list_check)
         total_expense_check = sum(item['amount'] for item in expense_list_check)
         total_saved_in_goals_check = sum(goal['saved_amount'] for goal in goals_list_check)
         available_balance_check = total_income_check - total_expense_check - total_saved_in_goals_check
         
-        # Check if enough balance available
+        # Validate: Check if enough balance available
         if expense_amount > available_balance_check:
             st.error(f"❌ Insufficient balance!")
             st.warning(f"💡 You're trying to spend ₹{expense_amount:,.2f} but only have ₹{available_balance_check:,.2f} available.")
@@ -63,8 +66,8 @@ with st.form("expense_form"):
                 st.divider()
                 st.info("💡 **Solutions:**\n- Add more income\n- Reduce expense amount\n- Withdraw money from goals")
         else:
-            # Save to database
-            add_expense_to_db(expense_category, expense_amount, expense_date, expense_description)
+            # Save to database with user_id
+            add_expense_to_db(user_id, expense_category, expense_amount, expense_date, expense_description)
             st.success(f"✅ Added expense of ₹{expense_amount:,.2f}!")
             st.balloons()
             st.rerun()
@@ -75,9 +78,9 @@ st.markdown("---")
 st.subheader("💰 Financial Summary")
 
 # Reload data for display
-income_list = get_all_income()
-expense_list = get_all_expenses()
-goals_list = get_all_goals()
+income_list = get_all_income(user_id)
+expense_list = get_all_expenses(user_id)
+goals_list = get_all_goals(user_id)
 
 # Calculate totals
 total_income = sum(item['amount'] for item in income_list)
@@ -184,7 +187,7 @@ if expense_list:
     st.download_button(
         label="📥 Download Expense Data",
         data=csv,
-        file_name=f"expenses_{datetime.now().date()}.csv",
+        file_name=f"expenses_{user_id}_{datetime.now().date()}.csv",
         mime='text/csv',
     )
     
@@ -200,11 +203,11 @@ if expense_list:
         if st.button("🗑️ Confirm Delete", type="primary"):
             selected_id = int(delete_id.split(' - ')[0])
             
-            # Get amount before deleting
+            # Get amount before deleting to show in success message
             deleted_expense = next((item for item in expense_list if item['id'] == selected_id), None)
             deleted_amount = deleted_expense['amount'] if deleted_expense else 0
             
-            delete_expense_from_db(selected_id)
+            delete_expense_from_db(user_id, selected_id)
             st.success(f"✅ Deleted! ₹{deleted_amount:,.2f} added back to your balance.")
             st.rerun()
 
