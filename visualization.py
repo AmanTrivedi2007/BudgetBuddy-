@@ -13,10 +13,13 @@ plt.rcParams['figure.figsize'] = (10, 6)
 
 st.title("📊 Spending Visualization")
 
-# Load data from database (NOT session state!)
-income_list = get_all_income()
-expense_list = get_all_expenses()
-goals_list = get_all_goals()
+# Get current logged-in user
+user_id = st.session_state.username
+
+# Load data from database with user_id
+income_list = get_all_income(user_id)
+expense_list = get_all_expenses(user_id)
+goals_list = get_all_goals(user_id)
 
 # Calculate totals using DATABASE data
 total_income = sum(item['amount'] for item in income_list)
@@ -503,7 +506,7 @@ with col1:
         st.download_button(
             label="📥 Download Expense Data",
             data=csv_expenses,
-            file_name=f"expenses_{datetime.now().date()}.csv",
+            file_name=f"expenses_{user_id}_{datetime.now().date()}.csv",
             mime='text/csv',
         )
 
@@ -518,6 +521,6 @@ with col2:
         st.download_button(
             label="📥 Download Income Data",
             data=csv_income,
-            file_name=f"income_{datetime.now().date()}.csv",
+            file_name=f"income_{user_id}_{datetime.now().date()}.csv",
             mime='text/csv',
         )
