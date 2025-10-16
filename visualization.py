@@ -4,6 +4,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 import numpy as np
+# visualization.py
+
+from database import get_all_income, get_all_expenses, get_all_goals
+
+# Load data from database
+income_list = get_all_income()
+expense_list = get_all_expenses()
+goals_list = get_all_goals()
+
+# Convert to format needed for visualizations
+# (rest of your visualization code remains the same)
 
 # Set style
 sns.set_style("whitegrid")
