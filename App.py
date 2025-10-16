@@ -17,9 +17,9 @@ page1 = st.Page("income_monitoring.py", title="Income Monitoring", icon="💵")
 page2 = st.Page("expense.py", title="Expense Tracking", icon="💳")
 page3 = st.Page("Saving_goal.py", title="Saving Goals", icon="🎯")
 page4 = st.Page("visualization.py", title="Spending Visualization", icon="📊")
-
+page5 = st.Page("Description.py",title="About",icon="🆎")
 # Create navigation
-pg = st.navigation([page1, page2, page3, page4], position="sidebar")
+pg = st.navigation([page1, page2, page3, page4,page5], position="sidebar")
 
 # Add sidebar header
 with st.sidebar:
@@ -28,3 +28,4 @@ with st.sidebar:
 
 # Run the selected page
 pg.run()
+
