@@ -1,20 +1,30 @@
+# App.py
 import streamlit as st
-import pandas as pd
-import numpy as np
+from database import init_database
 
+# Initialize database on app start
+init_database()
 
-import streamlit as st
+# Page configuration
+st.set_page_config(
+    page_title="BudgetBuddy",
+    page_icon="💰",
+    layout="wide"
+)
 
-# Define your pages
+# Define pages
+page1 = st.Page("income_monitoring.py", title="Income Monitoring", icon="💵")
+page2 = st.Page("expense_tracking.py", title="Expense Tracking", icon="💳")
+page3 = st.Page("Saving_goal.py", title="Saving Goals", icon="🎯")
+page4 = st.Page("visualization.py", title="Spending Visualization", icon="📊")
 
+# Create navigation
+pg = st.navigation([page1, page2, page3, page4], position="sidebar")
 
-page1 = st.Page("income_monitoring.py", title="Income", icon="💰")
-page2 = st.Page("expense.py",title="Expense",icon="🫰")
-page3 = st.Page("Saving_goal.py", title="Saving Goal", icon="🎯")
-page4 = st.Page("visualization.py",title="Charts",icon="📊")
-page5 = st.Page("Description.py", title="About Us", icon="💰")
+# Add sidebar header
+with st.sidebar:
+    st.title("💰 BudgetBuddy")
+    st.caption("Your Personal Finance Companion")
 
-# Create navigation in sidebar
-pg = st.navigation([page1,page2,page3,page4,page5], position="sidebar")
+# Run the selected page
 pg.run()
-
