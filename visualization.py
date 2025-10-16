@@ -1,20 +1,11 @@
+# visualization.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 import numpy as np
-# visualization.py
-
 from database import get_all_income, get_all_expenses, get_all_goals
-
-# Load data from database
-income_list = get_all_income()
-expense_list = get_all_expenses()
-goals_list = get_all_goals()
-
-# Convert to format needed for visualizations
-# (rest of your visualization code remains the same)
 
 # Set style
 sns.set_style("whitegrid")
@@ -22,18 +13,15 @@ plt.rcParams['figure.figsize'] = (10, 6)
 
 st.title("📊 Spending Visualization")
 
-# Initialize session states
-if 'income_list' not in st.session_state:
-    st.session_state.income_list = []
-if 'expense_list' not in st.session_state:
-    st.session_state.expense_list = []
-if 'goals_list' not in st.session_state:
-    st.session_state.goals_list = []
+# Load data from database (NOT session state!)
+income_list = get_all_income()
+expense_list = get_all_expenses()
+goals_list = get_all_goals()
 
-# Calculate totals
-total_income = sum(item['amount'] for item in st.session_state.income_list)
-total_expense = sum(item['amount'] for item in st.session_state.expense_list)
-total_saved_in_goals = sum(goal['saved_amount'] for goal in st.session_state.goals_list)
+# Calculate totals using DATABASE data
+total_income = sum(item['amount'] for item in income_list)
+total_expense = sum(item['amount'] for item in expense_list)
+total_saved_in_goals = sum(goal['saved_amount'] for goal in goals_list)
 available_balance = total_income - total_expense - total_saved_in_goals
 
 # Financial Overview Cards
@@ -52,16 +40,16 @@ with col4:
 st.markdown("---")
 
 # Check if data exists
-if not st.session_state.expense_list and not st.session_state.income_list:
+if not expense_list and not income_list:
     st.info("📝 No data to visualize yet. Add some income and expenses first!")
     st.stop()
 
 # SECTION 1: Expense by Category (Pie Chart)
-if st.session_state.expense_list:
+if expense_list:
     st.subheader("🍰 Expenses by Category")
     
     # Calculate expenses by category
-    expense_df = pd.DataFrame(st.session_state.expense_list)
+    expense_df = pd.DataFrame(expense_list)
     category_totals = expense_df.groupby('category')['amount'].sum().reset_index()
     category_totals = category_totals.sort_values('amount', ascending=False)
     
@@ -149,10 +137,10 @@ with col2:
 st.markdown("---")
 
 # SECTION 3: Income Sources Breakdown
-if st.session_state.income_list:
+if income_list:
     st.subheader("💵 Income Sources Breakdown")
     
-    income_df = pd.DataFrame(st.session_state.income_list)
+    income_df = pd.DataFrame(income_list)
     income_by_source = income_df.groupby('source')['amount'].sum().reset_index()
     income_by_source = income_by_source.sort_values('amount', ascending=True)
     
@@ -181,10 +169,10 @@ if st.session_state.income_list:
 st.markdown("---")
 
 # SECTION 4: Spending Trends Over Time (Line Chart)
-if st.session_state.expense_list:
+if expense_list:
     st.subheader("📈 Spending Trends Over Time")
     
-    expense_df = pd.DataFrame(st.session_state.expense_list)
+    expense_df = pd.DataFrame(expense_list)
     expense_df['date'] = pd.to_datetime(expense_df['date'])
     
     # Daily spending
@@ -212,10 +200,10 @@ if st.session_state.expense_list:
 st.markdown("---")
 
 # SECTION 5: Category-wise Spending Details
-if st.session_state.expense_list:
+if expense_list:
     st.subheader("📊 Category-wise Spending Details")
     
-    expense_df = pd.DataFrame(st.session_state.expense_list)
+    expense_df = pd.DataFrame(expense_list)
     
     col1, col2 = st.columns(2)
     
@@ -243,10 +231,10 @@ if st.session_state.expense_list:
 st.markdown("---")
 
 # SECTION 6: Heatmap of Spending by Category
-if st.session_state.expense_list:
+if expense_list:
     st.subheader("🔥 Category Spending Heatmap")
     
-    expense_df = pd.DataFrame(st.session_state.expense_list)
+    expense_df = pd.DataFrame(expense_list)
     expense_df['date'] = pd.to_datetime(expense_df['date'])
     expense_df['month'] = expense_df['date'].dt.to_period('M').astype(str)
     
@@ -276,12 +264,12 @@ if st.session_state.expense_list:
 st.markdown("---")
 
 # SECTION 7: Savings Goals Progress
-if st.session_state.goals_list:
+if goals_list:
     st.subheader("🎯 Savings Goals Progress")
     
     # Prepare data
     goals_data = []
-    for goal in st.session_state.goals_list:
+    for goal in goals_list:
         progress = (goal['saved_amount'] / goal['target_amount'] * 100) if goal['target_amount'] > 0 else 0
         goals_data.append({
             'Goal': goal['name'],
@@ -330,14 +318,14 @@ if st.session_state.goals_list:
 st.markdown("---")
 
 # SECTION 8: Monthly Summary
-if st.session_state.expense_list or st.session_state.income_list:
+if expense_list or income_list:
     st.subheader("📅 Monthly Summary")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.session_state.income_list:
-            income_df = pd.DataFrame(st.session_state.income_list)
+        if income_list:
+            income_df = pd.DataFrame(income_list)
             income_df['date'] = pd.to_datetime(income_df['date'])
             income_df['month'] = income_df['date'].dt.to_period('M').astype(str)
             monthly_income = income_df.groupby('month')['amount'].sum().reset_index()
@@ -363,8 +351,8 @@ if st.session_state.expense_list or st.session_state.income_list:
             plt.close()
     
     with col2:
-        if st.session_state.expense_list:
-            expense_df = pd.DataFrame(st.session_state.expense_list)
+        if expense_list:
+            expense_df = pd.DataFrame(expense_list)
             expense_df['date'] = pd.to_datetime(expense_df['date'])
             expense_df['month'] = expense_df['date'].dt.to_period('M').astype(str)
             monthly_expense = expense_df.groupby('month')['amount'].sum().reset_index()
@@ -425,8 +413,8 @@ with col1:
         reasons.append("⚠️ No active savings goals")
     
     # Number of income sources (15 points)
-    if st.session_state.income_list:
-        unique_sources = len(set(item['source'] for item in st.session_state.income_list))
+    if income_list:
+        unique_sources = len(set(item['source'] for item in income_list))
         if unique_sources >= 3:
             score += 15
             reasons.append("✅ Multiple income sources")
@@ -505,10 +493,10 @@ st.subheader("📥 Export Data")
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.session_state.expense_list:
+    if expense_list:
         @st.cache_data
         def convert_expenses_to_csv():
-            df = pd.DataFrame(st.session_state.expense_list)
+            df = pd.DataFrame(expense_list)
             return df.to_csv(index=False).encode('utf-8')
         
         csv_expenses = convert_expenses_to_csv()
@@ -520,10 +508,10 @@ with col1:
         )
 
 with col2:
-    if st.session_state.income_list:
+    if income_list:
         @st.cache_data
         def convert_income_to_csv():
-            df = pd.DataFrame(st.session_state.income_list)
+            df = pd.DataFrame(income_list)
             return df.to_csv(index=False).encode('utf-8')
         
         csv_income = convert_income_to_csv()
