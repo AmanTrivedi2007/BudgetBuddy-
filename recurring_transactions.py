@@ -41,6 +41,10 @@ def calculate_monthly_equivalent(amount, frequency):
         return amount * 4.33
     elif frequency == 'Monthly':
         return amount
+    elif frequency == '3 Months':  # NEW
+        return amount / 3
+    elif frequency == '6 Months':  # NEW
+        return amount / 6
     elif frequency == 'Yearly':
         return amount / 12
     return amount
@@ -140,7 +144,8 @@ with st.form("add_recurring_form", clear_on_submit=True):
             min_value=0.0, 
             value=5000.0, 
             step=100.0,
-            help="Amount for each occurrence"
+            help="Amount for each occurrence",
+            key="amount_input"  # For real-time update
         )
     
     col3, col4 = st.columns(2)
@@ -148,9 +153,10 @@ with st.form("add_recurring_form", clear_on_submit=True):
     with col3:
         frequency = st.selectbox(
             "Frequency*",
-            ["Daily", "Weekly", "Monthly", "Yearly"],
+            ["Daily", "Weekly", "Monthly", "3 Months", "6 Months", "Yearly"],  # UPDATED: Added 3 & 6 months
             index=2,
-            help="How often this transaction occurs"
+            help="How often this transaction occurs",
+            key="frequency_input"  # For real-time update
         )
     
     with col4:
@@ -166,10 +172,43 @@ with st.form("add_recurring_form", clear_on_submit=True):
         help="Add any additional notes about this recurring transaction"
     )
     
-    # Show monthly equivalent
+    # REAL-TIME AMOUNT UPDATE (changes as you type!)
     if amount > 0:
         monthly_equiv = calculate_monthly_equivalent(amount, frequency)
-        st.info(f"💰 **Monthly Impact:** ₹{monthly_equiv:,.0f} ({frequency.lower()})")
+        daily_equiv = monthly_equiv / 30
+        weekly_equiv = monthly_equiv / 4.33
+        yearly_equiv = monthly_equiv * 12
+        
+        st.markdown("##### 💰 Impact Analysis (Real-Time)")
+        
+        # Create 4 columns for breakdown
+        impact_col1, impact_col2, impact_col3, impact_col4 = st.columns(4)
+        
+        with impact_col1:
+            st.metric("📅 Daily", f"₹{daily_equiv:,.0f}")
+        
+        with impact_col2:
+            st.metric("🗓️ Weekly", f"₹{weekly_equiv:,.0f}")
+        
+        with impact_col3:
+            st.metric("📆 Monthly", f"₹{monthly_equiv:,.0f}")
+        
+        with impact_col4:
+            st.metric("🗓️ Yearly", f"₹{yearly_equiv:,.0f}")
+        
+        # Show selected frequency impact in colored box
+        if frequency == "Daily":
+            st.info(f"💡 **You selected Daily:** This will cost ₹{amount:,.0f}/day or ₹{monthly_equiv:,.0f}/month")
+        elif frequency == "Weekly":
+            st.info(f"💡 **You selected Weekly:** This will cost ₹{amount:,.0f}/week or ₹{monthly_equiv:,.0f}/month")
+        elif frequency == "Monthly":
+            st.info(f"💡 **You selected Monthly:** This will cost ₹{amount:,.0f}/month")
+        elif frequency == "3 Months":
+            st.info(f"💡 **You selected 3 Months:** This will cost ₹{amount:,.0f} every 3 months or ₹{monthly_equiv:,.0f}/month")
+        elif frequency == "6 Months":
+            st.info(f"💡 **You selected 6 Months:** This will cost ₹{amount:,.0f} every 6 months or ₹{monthly_equiv:,.0f}/month")
+        elif frequency == "Yearly":
+            st.info(f"💡 **You selected Yearly:** This will cost ₹{amount:,.0f}/year or ₹{monthly_equiv:,.0f}/month")
     
     submit_recurring = st.form_submit_button("💾 Add Recurring Transaction", use_container_width=True, type="primary")
     
@@ -419,7 +458,9 @@ with st.expander("💡 How Recurring Transactions Work", expanded=False):
     - **Daily**: Every day (e.g., daily allowance)
     - **Weekly**: Every 7 days (e.g., weekly grocery shopping)
     - **Monthly**: Once per month (e.g., salary, rent)
-    - **Yearly**: Once per year (e.g., insurance renewal)
+    - **3 Months**: Every 3 months (e.g., quarterly bills)
+    - **6 Months**: Every 6 months (e.g., half-yearly insurance)
+    - **Yearly**: Once per year (e.g., annual subscriptions)
     
     **Tips:**
     - Set up all regular transactions for better budgeting
