@@ -1,4 +1,4 @@
-# recurring_transactions.py - TRUE RECURRING AUTOMATION SYSTEM
+# recurring_transactions.py - Auto-add Salary, Rent, Subscriptions (WITH SAVINGS SYNC)
 
 import streamlit as st
 import pandas as pd
@@ -9,394 +9,438 @@ import seaborn as sns
 # Import shared categories
 from categories import EXPENSE_CATEGORIES, INCOME_CATEGORIES
 
-# Import database functions
-from database import (
-    add_recurring_transaction,
-    get_all_recurring_transactions,
-    delete_recurring_transaction,
-    process_recurring_transactions,  # This is the KEY function!
-    add_income_to_db,
-    add_expense_to_db,
-    get_all_income,
-    get_all_expenses
-)
-
 # Set seaborn style
 sns.set_style("whitegrid")
 
-# Check user login
+# Title
+st.title("🔄 Recurring Transactions")
+st.markdown("*Automate your regular income and expenses*")
+
+# Get current user
 if 'username' not in st.session_state or not st.session_state.username:
     st.error("⚠️ Please login first!")
     st.stop()
 
 user_id = st.session_state.username
 
-# ===== AUTO-PROCESS RECURRING TRANSACTIONS ON PAGE LOAD =====
-# This runs EVERY TIME the page loads and processes due transactions
-try:
-    processed_count = process_recurring_transactions(user_id)
-    if processed_count > 0:
-        st.success(f"✅ Automatically processed {processed_count} due recurring transaction(s)!")
-        st.balloons()
-except Exception as e:
-    st.error(f"⚠️ Error processing recurring transactions: {str(e)}")
+# Import database functions
+from database import (
+    get_all_recurring_transactions,
+    add_recurring_transaction,
+    delete_recurring_transaction,
+    process_recurring_transactions,
+    get_all_income,
+    get_all_expenses,
+    get_all_goals  # ← ADDED for savings sync
+)
 
-# Page header
-st.title("🔄 Recurring Transactions - Auto Payment System")
-st.markdown("*Set up automatic recurring income and expenses that process automatically!*")
+# ===== PROCESS PENDING RECURRING TRANSACTIONS =====
+# Auto-process any transactions that are due
+processed = process_recurring_transactions(user_id)
+if processed > 0:
+    st.success(f"✅ {processed} recurring transaction(s) processed automatically!")
 
 # ===== HELPER FUNCTIONS =====
-
 def calculate_monthly_equivalent(amount, frequency):
     """Convert any frequency to monthly amount"""
-    conversions = {
-        'Daily': amount * 30,
-        'Weekly': amount * 4.33,
-        'Monthly': amount,
-        '3 Months': amount / 3,
-        '6 Months': amount / 6,
-        'Yearly': amount / 12
-    }
-    return conversions.get(frequency, amount)
+    if frequency == 'Daily':
+        return amount * 30
+    elif frequency == 'Weekly':
+        return amount * 4.33
+    elif frequency == 'Monthly':
+        return amount
+    elif frequency == '3 Months':
+        return amount / 3
+    elif frequency == '6 Months':
+        return amount / 6
+    elif frequency == 'Yearly':
+        return amount / 12
+    return amount
 
-def calculate_all_periods(amount, frequency):
-    """Calculate all time period equivalents"""
-    monthly = calculate_monthly_equivalent(amount, frequency)
-    return {
-        'daily': monthly / 30,
-        'weekly': monthly / 4.33,
-        'monthly': monthly,
-        'yearly': monthly * 12
-    }
+def display_transaction_card(transaction, trans_type):
+    """Display a transaction card with details"""
+    next_date = datetime.strptime(transaction['next_date'], '%Y-%m-%d').date()
+    days_until = (next_date - datetime.now().date()).days
+    
+    if trans_type == 'Income':
+        color = "#E6F9E6"
+        border = "#00AA00"
+        icon = "💵"
+    else:
+        color = "#FFE6E6"
+        border = "#FF4444"
+        icon = "💳"
+    
+    with st.container():
+        st.markdown(f"""
+        <div style='background-color: {color}; 
+                    padding: 15px; 
+                    border-radius: 10px; 
+                    border-left: 5px solid {border};
+                    margin-bottom: 10px;'>
+            <h4 style='margin: 0;'>{icon} {transaction['category']}</h4>
+            <p style='margin: 5px 0;'><b>Amount:</b> ₹{transaction['amount']:,.2f}</p>
+            <p style='margin: 5px 0;'><b>Frequency:</b> {transaction['frequency']}</p>
+            <p style='margin: 5px 0;'><b>Next Date:</b> {transaction['next_date']}</p>
+            <p style='margin: 5px 0; color: {'green' if days_until > 7 else 'orange' if days_until > 0 else 'red'};'>
+                <b>{'In ' + str(days_until) + ' days' if days_until > 0 else 'DUE TODAY!' if days_until == 0 else 'OVERDUE by ' + str(abs(days_until)) + ' days'}</b>
+            </p>
+            {f"<p style='margin: 5px 0;'><i>{transaction['description']}</i></p>" if transaction['description'] else ""}
+        </div>
+        """, unsafe_allow_html=True)
 
-# ===== GET DATA =====
-all_income = get_all_income(user_id)
-all_expenses = get_all_expenses(user_id)
+# ===== FETCH ALL DATA =====
 recurring_transactions = get_all_recurring_transactions(user_id)
 
-# Separate recurring transactions
-recurring_income_list = [t for t in recurring_transactions if t['type'] == 'Income']
-recurring_expense_list = [t for t in recurring_transactions if t['type'] == 'Expense']
+all_income_data = get_all_income(user_id)
+all_expenses_data = get_all_expenses(user_id)
+all_goals_data = get_all_goals(user_id)  # ← ADDED for savings sync
 
-# Calculate totals
-total_income = sum([i['amount'] for i in all_income])
-total_expenses = sum([e['amount'] for e in all_expenses])
-net_balance = total_income - total_expenses
+total_income = sum(item['amount'] for item in all_income_data)
+total_expenses = sum(item['amount'] for item in all_expenses_data)
+total_saved_in_goals = sum(goal['saved_amount'] for goal in all_goals_data)  # ← ADDED
 
-# Calculate recurring monthly
-recurring_monthly_income = sum([calculate_monthly_equivalent(t['amount'], t['frequency']) for t in recurring_income_list])
-recurring_monthly_expenses = sum([calculate_monthly_equivalent(t['amount'], t['frequency']) for t in recurring_expense_list])
+# Separate recurring transactions by type
+recurring_income = [t for t in recurring_transactions if t['type'] == 'Income']
+recurring_expenses = [t for t in recurring_transactions if t['type'] == 'Expense']
+
+# Calculate monthly recurring amounts
+monthly_recurring_income = sum(calculate_monthly_equivalent(t['amount'], t['frequency']) for t in recurring_income)
+monthly_recurring_expenses = sum(calculate_monthly_equivalent(t['amount'], t['frequency']) for t in recurring_expenses)
 
 # ===== DASHBOARD OVERVIEW =====
-st.markdown("---")
-st.subheader("📊 Financial Overview")
+st.markdown("## 📊 Financial Overview")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #E8F5E9 0%, white 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #4CAF50; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <div style="font-size: 14px; color: #666; font-weight: 500;">Total Income</div>
-        <div style="font-size: 32px; font-weight: bold; color: #4CAF50; margin: 10px 0;">₹{total_income:,.0f}</div>
-        <div style="font-size: 12px; color: #666;">{len(all_income)} transactions</div>
-        <div style="font-size: 11px; color: #4CAF50; margin-top: 8px;">🔄 ₹{recurring_monthly_income:,.0f}/month recurring</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.metric(
+        "Total Income",
+        f"₹{total_income:,.2f}",
+        help="Total income from all sources (includes recurring)"
+    )
 
 with col2:
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #FFEBEE 0%, white 100%); padding: 20px; border-radius: 10px; border-left: 4px solid #F44336; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <div style="font-size: 14px; color: #666; font-weight: 500;">Total Expenses</div>
-        <div style="font-size: 32px; font-weight: bold; color: #F44336; margin: 10px 0;">₹{total_expenses:,.0f}</div>
-        <div style="font-size: 12px; color: #666;">{len(all_expenses)} transactions</div>
-        <div style="font-size: 11px; color: #F44336; margin-top: 8px;">🔄 ₹{recurring_monthly_expenses:,.0f}/month recurring</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.metric(
+        "Total Expenses",
+        f"₹{total_expenses:,.2f}",
+        help="Total expenses (includes recurring)"
+    )
 
 with col3:
-    net_color = "#4CAF50" if net_balance >= 0 else "#F44336"
-    net_monthly = recurring_monthly_income - recurring_monthly_expenses
-    net_monthly_color = "#4CAF50" if net_monthly >= 0 else "#F44336"
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #E3F2FD 0%, white 100%); padding: 20px; border-radius: 10px; border-left: 4px solid {net_color}; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <div style="font-size: 14px; color: #666; font-weight: 500;">Net Balance</div>
-        <div style="font-size: 32px; font-weight: bold; color: {net_color}; margin: 10px 0;">₹{net_balance:,.0f}</div>
-        <div style="font-size: 12px; color: #666;">{'Surplus' if net_balance >= 0 else 'Deficit'}</div>
-        <div style="font-size: 11px; color: {net_monthly_color}; margin-top: 8px;">🔄 ₹{net_monthly:,.0f}/month recurring</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # ← CHANGED: Now showing "Available Balance" instead of "Net Balance"
+    available_balance = total_income - total_expenses - total_saved_in_goals
+    st.metric(
+        "Available Balance",
+        f"₹{available_balance:,.2f}",
+        delta=f"{'Surplus' if available_balance >= 0 else 'Deficit'}",
+        delta_color="normal" if available_balance >= 0 else "inverse",
+        help="Income minus expenses minus savings in goals"
+    )
 
-if net_balance > 0:
-    st.success(f"✅ Great! You have a surplus of ₹{net_balance:,.0f}!")
-elif net_balance < 0:
-    st.error(f"⚠️ Warning: Deficit of ₹{abs(net_balance):,.0f}!")
-else:
-    st.info("💡 Balanced budget.")
+with col4:
+    net_recurring = monthly_recurring_income - monthly_recurring_expenses
+    st.metric(
+        "Monthly Recurring Net",
+        f"₹{net_recurring:,.2f}",
+        help="Net monthly recurring income minus expenses"
+    )
 
-# ===== ADD RECURRING TRANSACTIONS =====
 st.markdown("---")
-st.subheader("➕ Set Up Auto-Recurring Transaction")
-st.info("💡 **How it works:** Set up once, and transactions will be automatically created every interval!")
 
-income_tab, expense_tab = st.tabs(["💰 Auto Recurring Income", "💸 Auto Recurring Expense"])
+# ===== MONTHLY SUMMARY =====
+st.markdown("## 📅 Monthly Recurring Summary")
 
-# INCOME TAB
-with income_tab:
-    st.markdown("##### Set Up Automatic Recurring Income")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 💰 Recurring Income")
+    st.metric("Monthly Equivalent", f"₹{monthly_recurring_income:,.2f}")
+    st.caption(f"{len(recurring_income)} active recurring income(s)")
     
-    with st.form("add_auto_recurring_income", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            income_source = st.selectbox(
-                "Income Source*",
-                ["Salary", "Freelance", "Business", "Investment", "Bonus", "Gift", "Other"],
-                key="rec_income_source"
-            )
-            
-            income_amount = st.number_input(
-                "Amount (₹)*",
-                min_value=0.0,
-                value=50000.0,
-                step=500.0,
-                key="rec_income_amount"
-            )
-        
-        with col2:
-            income_frequency = st.selectbox(
-                "Frequency*",
-                ["Daily", "Weekly", "Monthly", "3 Months", "6 Months", "Yearly"],
-                index=2,
-                help="Transactions will be auto-created at this interval",
-                key="rec_income_frequency"
-            )
-            
-            income_start_date = st.date_input(
-                "Start Date*",
-                value=datetime.now().date(),
-                help="First transaction date",
-                key="rec_income_start_date"
-            )
-        
-        income_notes = st.text_area(
-            "Notes (Optional)",
-            placeholder="e.g., Monthly salary from XYZ Company",
-            key="rec_income_notes"
+    if recurring_income:
+        for trans in recurring_income:
+            monthly_equiv = calculate_monthly_equivalent(trans['amount'], trans['frequency'])
+            st.markdown(f"- **{trans['category']}**: ₹{trans['amount']:,.2f} ({trans['frequency']}) = ₹{monthly_equiv:,.2f}/month")
+
+with col2:
+    st.markdown("### 💳 Recurring Expenses")
+    st.metric("Monthly Equivalent", f"₹{monthly_recurring_expenses:,.2f}")
+    st.caption(f"{len(recurring_expenses)} active recurring expense(s)")
+    
+    if recurring_expenses:
+        for trans in recurring_expenses:
+            monthly_equiv = calculate_monthly_equivalent(trans['amount'], trans['frequency'])
+            st.markdown(f"- **{trans['category']}**: ₹{trans['amount']:,.2f} ({trans['frequency']}) = ₹{monthly_equiv:,.2f}/month")
+
+st.markdown("---")
+
+# ===== ADD NEW RECURRING TRANSACTION =====
+st.markdown("## ➕ Add New Recurring Transaction")
+
+with st.form("add_recurring_form"):
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        trans_type = st.selectbox(
+            "Type",
+            ["Income", "Expense"],
+            help="Choose whether this is recurring income or expense"
         )
         
-        submit_rec_income = st.form_submit_button("💾 Set Up Auto-Recurring Income", use_container_width=True, type="primary")
+        if trans_type == "Income":
+            category = st.selectbox("Income Source", INCOME_CATEGORIES)
+        else:
+            category = st.selectbox("Expense Category", EXPENSE_CATEGORIES)
         
-        if submit_rec_income:
-            if income_amount <= 0:
-                st.error("❌ Amount must be greater than 0")
-            else:
-                # Add to recurring_transactions table (NOT income table directly!)
-                success = add_recurring_transaction(
-                    user_id=user_id,
-                    trans_type="Income",
-                    category=income_source,
-                    amount=income_amount,
-                    frequency=income_frequency,
-                    start_date=income_start_date,
-                    description=income_notes
-                )
-                
-                if success:
-                    periods = calculate_all_periods(income_amount, income_frequency)
-                    
-                    st.success(f"✅ Auto-recurring income set up: **{income_source}** - ₹{income_amount:,.0f} ({income_frequency})")
-                    st.info(f"🔔 **Automatic Processing:** This will be automatically added to your Income page every {income_frequency}!")
-                    
-                    # Show financial impact
-                    st.markdown("##### 💰 Financial Impact")
-                    impact_col1, impact_col2, impact_col3, impact_col4 = st.columns(4)
-                    
-                    with impact_col1:
-                        st.metric("📅 Daily", f"₹{periods['daily']:,.0f}")
-                    with impact_col2:
-                        st.metric("🗓️ Weekly", f"₹{periods['weekly']:,.0f}")
-                    with impact_col3:
-                        st.metric("📆 Monthly", f"₹{periods['monthly']:,.0f}")
-                    with impact_col4:
-                        st.metric("📅 Yearly", f"₹{periods['yearly']:,.0f}")
-                    
-                    st.balloons()
-                    st.rerun()
-                else:
-                    st.error("❌ Error setting up recurring income")
-
-# EXPENSE TAB
-with expense_tab:
-    st.markdown("##### Set Up Automatic Recurring Expense")
+        amount = st.number_input(
+            "Amount (₹)",
+            min_value=0.0,
+            step=1.0,
+            help="Enter the recurring amount"
+        )
     
-    with st.form("add_auto_recurring_expense", clear_on_submit=True):
-        col1, col2 = st.columns(2)
+    with col2:
+        frequency = st.selectbox(
+            "Frequency",
+            ["Daily", "Weekly", "Monthly", "3 Months", "6 Months", "Yearly"],
+            index=2,
+            help="How often does this transaction occur?"
+        )
         
-        with col1:
-            expense_category = st.selectbox(
-                "Expense Category*",
-                EXPENSE_CATEGORIES,
-                key="rec_expense_category"
-            )
-            
-            expense_amount = st.number_input(
-                "Amount (₹)*",
-                min_value=0.0,
-                value=5000.0,
-                step=500.0,
-                key="rec_expense_amount"
-            )
+        start_date = st.date_input(
+            "Start Date",
+            value=datetime.now().date(),
+            help="When should this recurring transaction start?"
+        )
         
-        with col2:
-            expense_frequency = st.selectbox(
-                "Frequency*",
-                ["Daily", "Weekly", "Monthly", "3 Months", "6 Months", "Yearly"],
-                index=2,
-                help="Transactions will be auto-created at this interval",
-                key="rec_expense_frequency"
-            )
-            
-            expense_start_date = st.date_input(
-                "Start Date*",
-                value=datetime.now().date(),
-                help="First transaction date",
-                key="rec_expense_start_date"
-            )
-        
-        expense_description = st.text_area(
+        description = st.text_input(
             "Description (Optional)",
-            placeholder="e.g., Monthly rent payment",
-            key="rec_expense_description"
+            placeholder="e.g., Monthly salary, Netflix subscription, etc."
+        )
+    
+    # Show monthly equivalent
+    if amount > 0:
+        monthly_equiv = calculate_monthly_equivalent(amount, frequency)
+        st.info(f"💡 This equals approximately **₹{monthly_equiv:,.2f} per month**")
+    
+    submit = st.form_submit_button("➕ Add Recurring Transaction", use_container_width=True)
+    
+    if submit:
+        if amount <= 0:
+            st.error("❌ Amount must be greater than 0")
+        elif not category:
+            st.error("❌ Please select a category")
+        else:
+            success = add_recurring_transaction(
+                user_id=user_id,
+                trans_type=trans_type,
+                category=category,
+                amount=amount,
+                frequency=frequency,
+                start_date=str(start_date),
+                description=description
+            )
+            
+            if success:
+                st.success(f"✅ Recurring {trans_type.lower()} added successfully!")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("❌ Failed to add recurring transaction. Please try again.")
+
+st.markdown("---")
+
+# ===== UPCOMING TRANSACTIONS =====
+st.markdown("## 🔔 Upcoming Transactions (Next 7 Days)")
+
+today = datetime.now().date()
+upcoming_deadline = today + timedelta(days=7)
+
+upcoming = [t for t in recurring_transactions if datetime.strptime(t['next_date'], '%Y-%m-%d').date() <= upcoming_deadline]
+
+if upcoming:
+    st.info(f"📌 You have **{len(upcoming)}** transaction(s) coming up in the next 7 days")
+    
+    for trans in sorted(upcoming, key=lambda x: x['next_date']):
+        display_transaction_card(trans, trans['type'])
+else:
+    st.success("✅ No transactions due in the next 7 days")
+
+st.markdown("---")
+
+# ===== ALL RECURRING TRANSACTIONS =====
+st.markdown("## 📋 All Recurring Transactions")
+
+tab1, tab2, tab3 = st.tabs(["💵 Recurring Income", "💳 Recurring Expenses", "📊 All Transactions"])
+
+with tab1:
+    if recurring_income:
+        st.success(f"**{len(recurring_income)}** active recurring income(s)")
+        for trans in recurring_income:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                display_transaction_card(trans, 'Income')
+            with col2:
+                st.write("")  # Spacing
+                st.write("")  # Spacing
+                if st.button(f"🗑️ Delete", key=f"delete_income_{trans['id']}", use_container_width=True):
+                    if delete_recurring_transaction(trans['id']):
+                        st.success("✅ Deleted!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Delete failed")
+    else:
+        st.info("💡 No recurring income set up yet. Add your salary or regular income above!")
+
+with tab2:
+    if recurring_expenses:
+        st.warning(f"**{len(recurring_expenses)}** active recurring expense(s)")
+        for trans in recurring_expenses:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                display_transaction_card(trans, 'Expense')
+            with col2:
+                st.write("")  # Spacing
+                st.write("")  # Spacing
+                if st.button(f"🗑️ Delete", key=f"delete_expense_{trans['id']}", use_container_width=True):
+                    if delete_recurring_transaction(trans['id']):
+                        st.success("✅ Deleted!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Delete failed")
+    else:
+        st.info("💡 No recurring expenses set up yet. Add your rent, subscriptions, or bills above!")
+
+with tab3:
+    if recurring_transactions:
+        # Create DataFrame for better display
+        df_data = []
+        for trans in recurring_transactions:
+            monthly_equiv = calculate_monthly_equivalent(trans['amount'], trans['frequency'])
+            next_date = datetime.strptime(trans['next_date'], '%Y-%m-%d').date()
+            days_until = (next_date - today).days
+            
+            df_data.append({
+                'Type': trans['type'],
+                'Category': trans['category'],
+                'Amount': f"₹{trans['amount']:,.2f}",
+                'Frequency': trans['frequency'],
+                'Monthly Equiv.': f"₹{monthly_equiv:,.2f}",
+                'Next Date': trans['next_date'],
+                'Days Until': days_until,
+                'Description': trans['description'] or '-'
+            })
+        
+        df = pd.DataFrame(df_data)
+        
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True
         )
         
-        submit_rec_expense = st.form_submit_button("💾 Set Up Auto-Recurring Expense", use_container_width=True, type="primary")
-        
-        if submit_rec_expense:
-            if expense_amount <= 0:
-                st.error("❌ Amount must be greater than 0")
-            else:
-                # Add to recurring_transactions table (NOT expenses table directly!)
-                success = add_recurring_transaction(
-                    user_id=user_id,
-                    trans_type="Expense",
-                    category=expense_category,
-                    amount=expense_amount,
-                    frequency=expense_frequency,
-                    start_date=expense_start_date,
-                    description=expense_description
-                )
-                
-                if success:
-                    periods = calculate_all_periods(expense_amount, expense_frequency)
-                    
-                    st.success(f"✅ Auto-recurring expense set up: **{expense_category}** - ₹{expense_amount:,.0f} ({expense_frequency})")
-                    st.info(f"🔔 **Automatic Processing:** This will be automatically added to your Expense page every {expense_frequency}!")
-                    
-                    # Show financial impact
-                    st.markdown("##### 💸 Financial Impact")
-                    impact_col1, impact_col2, impact_col3, impact_col4 = st.columns(4)
-                    
-                    with impact_col1:
-                        st.metric("📅 Daily", f"₹{periods['daily']:,.0f}")
-                    with impact_col2:
-                        st.metric("🗓️ Weekly", f"₹{periods['weekly']:,.0f}")
-                    with impact_col3:
-                        st.metric("📆 Monthly", f"₹{periods['monthly']:,.0f}")
-                    with impact_col4:
-                        st.metric("📅 Yearly", f"₹{periods['yearly']:,.0f}")
-                    
-                    st.balloons()
-                    st.rerun()
-                else:
-                    st.error("❌ Error setting up recurring expense")
+        # Download button
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download as CSV",
+            data=csv,
+            file_name=f"recurring_transactions_{user_id}_{datetime.now().date()}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    else:
+        st.info("💡 No recurring transactions set up yet")
 
-# ===== SCHEDULED RECURRING TRANSACTIONS =====
 st.markdown("---")
-st.subheader("📅 Scheduled Auto-Recurring Transactions")
-st.caption("💡 These are set up for automatic processing - they will auto-create transactions when due!")
 
-if recurring_income_list or recurring_expense_list:
-    tab1, tab2 = st.tabs([f"💰 Auto Income ({len(recurring_income_list)})", f"💸 Auto Expenses ({len(recurring_expense_list)})"])
+# ===== VISUALIZATION =====
+if recurring_transactions:
+    st.markdown("## 📊 Recurring Transactions Visualization")
     
-    with tab1:
-        if recurring_income_list:
-            st.markdown("##### Scheduled Auto-Recurring Income")
-            for rec in recurring_income_list:
-                next_date = datetime.strptime(rec['next_date'], '%Y-%m-%d').date()
-                days_until = (next_date - datetime.now().date()).days
-                
-                col_a, col_b, col_c = st.columns([3, 2, 1])
-                
-                with col_a:
-                    st.success(f"💰 **{rec['category']}** - ₹{rec['amount']:,.0f}")
-                    st.caption(f"📝 {rec.get('description', 'No description')}")
-                
-                with col_b:
-                    st.info(f"🔁 Every {rec['frequency']}")
-                    if days_until <= 0:
-                        st.error(f"⚠️ Due today! (will auto-process)")
-                    elif days_until <= 3:
-                        st.warning(f"⏰ Due in {days_until} days")
-                    else:
-                        st.caption(f"📅 Next: {rec['next_date']}")
-                
-                with col_c:
-                    if st.button("🗑️ Delete", key=f"del_rec_inc_{rec['id']}", type="secondary"):
-                        if delete_recurring_transaction(rec['id']):
-                            st.success("✅ Deleted")
-                            st.rerun()
-                
-                st.markdown("---")
-        else:
-            st.info("💡 No auto-recurring income set up yet.")
+    col1, col2 = st.columns(2)
     
-    with tab2:
-        if recurring_expense_list:
-            st.markdown("##### Scheduled Auto-Recurring Expenses")
-            for rec in recurring_expense_list:
-                next_date = datetime.strptime(rec['next_date'], '%Y-%m-%d').date()
-                days_until = (next_date - datetime.now().date()).days
-                
-                col_a, col_b, col_c = st.columns([3, 2, 1])
-                
-                with col_a:
-                    st.error(f"💸 **{rec['category']}** - ₹{rec['amount']:,.0f}")
-                    st.caption(f"📝 {rec.get('description', 'No description')}")
-                
-                with col_b:
-                    st.info(f"🔁 Every {rec['frequency']}")
-                    if days_until <= 0:
-                        st.error(f"⚠️ Due today! (will auto-process)")
-                    elif days_until <= 3:
-                        st.warning(f"⏰ Due in {days_until} days")
-                    else:
-                        st.caption(f"📅 Next: {rec['next_date']}")
-                
-                with col_c:
-                    if st.button("🗑️ Delete", key=f"del_rec_exp_{rec['id']}", type="secondary"):
-                        if delete_recurring_transaction(rec['id']):
-                            st.success("✅ Deleted")
-                            st.rerun()
-                
-                st.markdown("---")
-        else:
-            st.info("💡 No auto-recurring expenses set up yet.")
-else:
-    st.info("💡 No auto-recurring transactions set up yet. Add your first one above!")
+    with col1:
+        # Monthly recurring by category
+        st.markdown("### Monthly Recurring by Category")
+        
+        monthly_by_category = {}
+        for trans in recurring_transactions:
+            monthly_amount = calculate_monthly_equivalent(trans['amount'], trans['frequency'])
+            category = trans['category']
+            if category in monthly_by_category:
+                monthly_by_category[category] += monthly_amount
+            else:
+                monthly_by_category[category] = monthly_amount
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        categories = list(monthly_by_category.keys())
+        amounts = list(monthly_by_category.values())
+        colors = sns.color_palette("husl", len(categories))
+        
+        ax.barh(categories, amounts, color=colors)
+        ax.set_xlabel('Monthly Amount (₹)')
+        ax.set_title('Monthly Recurring Amount by Category')
+        ax.grid(axis='x', alpha=0.3)
+        
+        for i, v in enumerate(amounts):
+            ax.text(v, i, f' ₹{v:,.0f}', va='center')
+        
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+    
+    with col2:
+        # Income vs Expense pie chart
+        st.markdown("### Monthly Recurring: Income vs Expenses")
+        
+        fig, ax = plt.subplots(figsize=(8, 8))
+        
+        sizes = [monthly_recurring_income, monthly_recurring_expenses]
+        labels = [f'Income\n₹{monthly_recurring_income:,.0f}', f'Expenses\n₹{monthly_recurring_expenses:,.0f}']
+        colors = ['#00AA00', '#FF4444']
+        explode = (0.1, 0)
+        
+        ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%',
+               shadow=True, startangle=90, textprops={'fontsize': 12, 'weight': 'bold'})
+        ax.axis('equal')
+        ax.set_title('Monthly Recurring Income vs Expenses', fontsize=14, weight='bold')
+        
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+
+st.markdown("---")
+
+# ===== TIPS & INFO =====
+with st.expander("💡 Tips for Managing Recurring Transactions"):
+    st.markdown("""
+    ### Best Practices:
+    
+    **Setting Up:**
+    - ✅ Add your monthly salary as recurring income
+    - ✅ Add rent, subscriptions (Netflix, Spotify), and bills
+    - ✅ Set realistic start dates
+    
+    **Monitoring:**
+    - 📊 Check "Upcoming Transactions" regularly
+    - 🔔 Transactions process automatically on due date
+    - 📈 Review the visualizations to see spending patterns
+    
+    **Managing:**
+    - ✏️ Delete or pause subscriptions you no longer need
+    - 💰 Use monthly equivalents to understand annual impact
+    - 🎯 Plan your budget around recurring expenses
+    
+    **Examples:**
+    - **Income**: Salary (Monthly), Freelance retainer (Monthly)
+    - **Expenses**: Rent (Monthly), Netflix (Monthly), Gym (Yearly)
+    
+    **Automation:**
+    - Transactions are automatically added to your income/expense records on the due date
+    - Check your main income/expense pages to see processed transactions
+    - The "Next Date" updates automatically after processing
+    """)
 
 # Footer
-st.markdown("---")
-st.markdown("### ✅ How Auto-Recurring Works")
-st.success("""
-**Perfect Automation:**
-1. 🔄 **Set up once** - Add your recurring income/expense with frequency
-2. ⏰ **Auto-processing** - System checks daily and creates transactions automatically
-3. 💰 **Shows in Income/Expense pages** - Auto-created transactions appear automatically
-4. 📅 **Updates next date** - System automatically calculates next occurrence
-5. ♾️ **Repeats forever** - Until you delete the recurring schedule
-
-**No manual work needed - just set it and forget it!**
-""")
-
-st.caption("🔄 Recurring Transactions - Auto Payment System | BudgetBuddy Pro")
-st.caption("💡 Powered by intelligent automation engine")
+st.caption("💡 Recurring transactions are processed automatically. Check your Income/Expense pages to see them reflected in your totals.")
