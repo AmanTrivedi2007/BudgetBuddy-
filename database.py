@@ -9,25 +9,70 @@ import hashlib
 DB_FILE = "budgetbuddy.db"
 
 def init_database():
-    """Initialize database - auto-deletes old database without user_id"""
+    """Initialize database - auto-migrates old schema to new"""
     
-    # Delete old database if it doesn't have user_id column
+    # Check if database needs migration
     if os.path.exists(DB_FILE):
         try:
             conn = sqlite3.connect(DB_FILE)
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(income)")
-            columns = [col[1] for col in cursor.fetchall()]
-            conn.close()
             
-            if 'user_id' not in columns:
+            # Check if users table exists and has correct structure
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            users_table_exists = cursor.fetchone()
+            
+            if users_table_exists:
+                # Check users table columns
+                cursor.execute("PRAGMA table_info(users)")
+                user_columns = [col[1] for col in cursor.fetchall()]
+                
+                # If old schema (has 'username' instead of 'username_hash'), delete database
+                if 'username' in user_columns and 'username_hash' not in user_columns:
+                    conn.close()
+                    os.remove(DB_FILE)
+                    print("✅ Old schema detected - recreating database")
+                    # Will recreate below
+                elif 'email_hash' not in user_columns:
+                    # Missing email_hash column, recreate
+                    conn.close()
+                    os.remove(DB_FILE)
+                    print("✅ Missing email_hash column - recreating database")
+                else:
+                    conn.close()
+                    # Schema is correct, just ensure all tables exist
+            else:
+                # Users table doesn't exist, check income table
+                cursor.execute("PRAGMA table_info(income)")
+                income_columns = [col[1] for col in cursor.fetchall()]
+                conn.close()
+                
+                if 'user_id' not in income_columns:
+                    os.remove(DB_FILE)
+                    print("✅ Old database format - recreating")
+        except Exception as e:
+            # Any error, just recreate
+            try:
                 os.remove(DB_FILE)
-        except:
-            pass
+                print(f"✅ Database error - recreating: {e}")
+            except:
+                pass
     
-    # Create tables
+    # Create all tables with correct schema
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    
+    # Create users table with hashed username and email
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            username_hash TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            email_hash TEXT UNIQUE NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     # Create income table WITH user_id
     cursor.execute('''
@@ -83,7 +128,7 @@ def init_database():
         )
     ''')
     
-    # NEW: Login attempts table (persistent across reboots)
+    # Create login attempts table (persistent)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS login_attempts (
             username_hash TEXT PRIMARY KEY,
@@ -95,6 +140,7 @@ def init_database():
     
     conn.commit()
     conn.close()
+    print("✅ Database initialized successfully")
 
 # ===== INCOME FUNCTIONS =====
 def add_income_to_db(user_id, source, amount, date, notes=""):
@@ -283,7 +329,7 @@ def delete_goal_from_db(user_id, goal_name):
     conn.commit()
     conn.close()
 
-# ===== LOGIN ATTEMPTS FUNCTIONS (NEW) =====
+# ===== LOGIN ATTEMPTS FUNCTIONS =====
 def get_login_attempts(username):
     """Get login attempts from database"""
     username_hash = hashlib.sha256(username.lower().encode()).hexdigest()
