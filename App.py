@@ -21,18 +21,27 @@ page1 = st.Page("income_monitoring.py", title="Income Monitoring", icon="💵")
 page2 = st.Page("expense.py", title="Expense Tracking", icon="💳")
 page3 = st.Page("Saving_goal.py", title="Saving Goals", icon="🎯")
 page4 = st.Page("visualization.py", title="Spending Visualization", icon="📊")
-page5 = st.Page("Description.py",title="About",icon="🆎")
+page5 = st.Page("Description.py", title="About", icon="🆎")
+
 # Create navigation
-pg = st.navigation([page1, page2, page3, page4,page5], position="sidebar")
+pg = st.navigation([page1, page2, page3, page4, page5], position="sidebar")
 
 # Sidebar header with user info
 with st.sidebar:
     st.markdown("---")
-    st.markdown(f"### 👤 User: **{username}**")
+    
+    # Show full name if available, otherwise just username
+    if st.session_state.get('full_name'):
+        st.markdown(f"### 👤 {st.session_state.full_name}")
+        st.caption(f"@{username}")
+    else:
+        st.markdown(f"### 👤 {username}")
     
     # Logout button
-    if st.button("🚪 Logout", use_container_width=True):
+    if st.button("🚪 Logout", use_container_width=True, type="primary"):
+        # Clear all session state
         st.session_state.username = None
+        st.session_state.full_name = None
         st.rerun()
     
     st.markdown("---")
