@@ -1,4 +1,4 @@
-# App.py - Main Application with All Features
+# App.py - Main Application with Onboarding Tutorial
 
 import streamlit as st
 from database import init_database
@@ -22,22 +22,38 @@ username = check_authentication()
 if 'dark_mode' not in st.session_state:
     st.session_state.dark_mode = False
 
-# Define all pages (including NEW pages)
+# ===========================
+# SHOW ONBOARDING TUTORIAL FOR NEW USERS
+# ===========================
+from boarding import show_onboarding_tutorial
+
+# Check if tutorial should be shown
+if show_onboarding_tutorial():
+    # Tutorial is active - stop here and don't show the rest of the app
+    st.stop()
+
+# ===========================
+# MAIN APP (Shows only after tutorial is completed/skipped)
+# ===========================
+
+# Define all pages
 page1 = st.Page("Description.py", title="Home", icon="🏠")
 page2 = st.Page("income_monitoring.py", title="Income Monitoring", icon="💵")
 page3 = st.Page("expense.py", title="Expense Tracking", icon="💳")
 page4 = st.Page("budget_manager.py", title="Budget Manager", icon="💰")
 page5 = st.Page("recurring_transactions.py", title="Recurring Transactions", icon="🔁")
 page6 = st.Page("Saving_goal.py", title="Savings Goals", icon="🎯")
-page7 = st.Page("visualization.py", title="Visualizations", icon="📊")
+page7 = st.Page("visualization.py", title="Advanced Visualizations", icon="📊")
 
 # Create navigation with all pages
 pg = st.navigation(
-    [page1, page2, page3, page4, page5, page6, page7], 
+    [page1, page2, page3, page4, page5, page6, page7],
     position="sidebar"
 )
 
-# Sidebar with user info and settings
+# ===========================
+# SIDEBAR - User Info & Settings
+# ===========================
 with st.sidebar:
     st.markdown("---")
     
@@ -50,11 +66,12 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Dark Mode Toggle (NEW)
+    # Settings Section
     st.markdown("### ⚙️ Settings")
     
+    # Dark Mode Toggle
     dark_mode = st.toggle(
-        "🌙 Dark Mode", 
+        "🌙 Dark Mode",
         value=st.session_state.dark_mode,
         help="Toggle dark/light theme"
     )
@@ -66,81 +83,69 @@ with st.sidebar:
     # Apply dark mode CSS
     if st.session_state.dark_mode:
         st.markdown("""
-            <style>
-            /* Dark mode styles */
+        <style>
             .stApp {
-                background-color: #1E1E1E;
-                color: #E0E0E0;
+                background-color: #1e1e1e;
+                color: #ffffff;
             }
             .stSidebar {
-                background-color: #2D2D2D;
+                background-color: #2d2d2d;
             }
             .stMarkdown {
-                color: #E0E0E0;
+                color: #ffffff;
             }
-            .stTextInput input, .stNumberInput input, .stTextArea textarea {
-                background-color: #3D3D3D;
-                color: #E0E0E0;
-                border-color: #555555;
-            }
-            .stSelectbox select {
-                background-color: #3D3D3D;
-                color: #E0E0E0;
-            }
-            .stButton button {
-                background-color: #4A4A4A;
-                color: #E0E0E0;
-                border-color: #666666;
-            }
-            .stButton button:hover {
-                background-color: #5A5A5A;
-                border-color: #777777;
-            }
-            div[data-testid="stMetricValue"] {
-                color: #E0E0E0;
-            }
-            </style>
+        </style>
         """, unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Show Tutorial Button (NEW)
-    if st.button("📖 Show Tutorial", use_container_width=True):
+    # Tutorial Controls
+    st.markdown("### 📚 Help & Tutorials")
+    
+    # Show Tutorial Button
+    if st.button("📖 Restart Tutorial", use_container_width=True):
         # Reset onboarding to show again
-        if 'onboarding_completed' in st.session_state:
-            del st.session_state.onboarding_completed
-        if 'onboarding_step' in st.session_state:
-            del st.session_state.onboarding_step
-        st.success("Tutorial will appear on next page!")
+        from boarding import reset_onboarding
+        reset_onboarding()
+        st.success("✅ Tutorial reset! Reloading...")
         st.rerun()
+    
+    st.markdown("---")
+    
+    # Quick Tips
+    with st.expander("💡 Quick Tips"):
+        st.markdown("""
+        **Daily Tasks:**
+        - Log expenses immediately
+        - Check your dashboard
+        
+        **Weekly Reviews:**
+        - Review spending trends
+        - Update budget limits
+        
+        **Monthly Goals:**
+        - Export data for records
+        - Adjust savings goals
+        """)
     
     st.markdown("---")
     
     # Logout button
     if st.button("🚪 Logout", use_container_width=True, type="primary"):
-        st.session_state.username = None
-        st.session_state.full_name = None
-        st.session_state.dark_mode = False
-        if 'onboarding_completed' in st.session_state:
-            del st.session_state.onboarding_completed
+        # Clear all session state
+        keys_to_clear = ['username', 'full_name', 'dark_mode', 'onboarding_completed', 'onboarding_step']
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
     
     st.markdown("---")
     
     # Footer info
-    st.caption("💰 Your personal finance data")
-    st.caption("🔒 Private & Secure")
-    st.caption("📊 Real-time insights")
-
-# Show onboarding tutorial for first-time users (NEW)
-# CORRECTED: Changed from onboarding to boarding
-from boarding import show_onboarding_tutorial
-
-if 'onboarding_completed' not in st.session_state:
-    # Show tutorial
-    tutorial_completed = show_onboarding_tutorial()
-    if not tutorial_completed:
-        st.stop()  # Stop until tutorial is completed or skipped
+    st.caption("💰 BudgetBuddy v3.0")
+    st.caption("🔒 Your data is private & secure")
+    st.caption("📊 Real-time financial insights")
+    st.caption("🎯 Smart budget management")
 
 # Run the selected page
 pg.run()
