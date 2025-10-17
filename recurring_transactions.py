@@ -41,9 +41,9 @@ def calculate_monthly_equivalent(amount, frequency):
         return amount * 4.33
     elif frequency == 'Monthly':
         return amount
-    elif frequency == '3 Months':  # NEW
+    elif frequency == '3 Months':
         return amount / 3
-    elif frequency == '6 Months':  # NEW
+    elif frequency == '6 Months':
         return amount / 6
     elif frequency == 'Yearly':
         return amount / 12
@@ -101,142 +101,208 @@ def display_transaction_card(transaction, trans_type):
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ===== PROCESS DUE TRANSACTIONS =====
-# Auto-process any transactions that are due
 due_count = process_recurring_transactions(user_id)
 if due_count > 0:
     st.success(f"✅ Processed {due_count} recurring transaction(s) automatically!")
 
-# ===== SECTION 1: ADD NEW RECURRING TRANSACTION (NOW AT TOP!) =====
+# ===== SECTION 1: ADD NEW RECURRING TRANSACTION WITH TABS =====
 st.markdown("---")
 st.subheader("➕ Add New Recurring Transaction")
 
-with st.form("add_recurring_form", clear_on_submit=True):
-    st.markdown("##### Transaction Details")
-    
-    # Type selection
-    transaction_type = st.radio(
-        "Type*", 
-        ["Income", "Expense"], 
-        horizontal=True,
-        help="Choose whether this is recurring income or expense"
-    )
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Dynamic category selection based on type
-        if transaction_type == "Income":
-            category = st.selectbox(
-                "Category*", 
+# CREATE TWO TABS - ONE FOR INCOME, ONE FOR EXPENSE
+income_tab, expense_tab = st.tabs(["💵 Add Recurring Income", "💳 Add Recurring Expense"])
+
+# ===== INCOME TAB =====
+with income_tab:
+    with st.form("add_recurring_income_form", clear_on_submit=True):
+        st.markdown("##### Recurring Income Details")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            income_category = st.selectbox(
+                "Income Category*", 
                 INCOME_CATEGORIES,
                 help="Select the type of recurring income"
             )
-        else:
-            category = st.selectbox(
-                "Category*", 
+        
+        with col2:
+            income_amount = st.number_input(
+                "Amount (₹)*", 
+                min_value=0.0, 
+                value=5000.0, 
+                step=100.0,
+                help="Amount for each occurrence",
+                key="income_amount"
+            )
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            income_frequency = st.selectbox(
+                "Frequency*",
+                ["Daily", "Weekly", "Monthly", "3 Months", "6 Months", "Yearly"],
+                index=2,
+                help="How often this income occurs",
+                key="income_frequency"
+            )
+        
+        with col4:
+            income_start_date = st.date_input(
+                "Start Date*",
+                value=datetime.now().date(),
+                help="When should this recurring income start?",
+                key="income_start_date"
+            )
+        
+        income_description = st.text_area(
+            "Description (Optional)",
+            placeholder="e.g., Monthly salary from ABC Company",
+            help="Add any additional notes",
+            key="income_description"
+        )
+        
+        submit_income = st.form_submit_button("💾 Add Recurring Income", use_container_width=True, type="primary")
+        
+        if submit_income:
+            if income_amount <= 0:
+                st.error("❌ Amount must be greater than 0")
+            else:
+                success = add_recurring_transaction(
+                    user_id=user_id,
+                    trans_type="Income",
+                    category=income_category,
+                    amount=income_amount,
+                    frequency=income_frequency,
+                    start_date=income_start_date,
+                    description=income_description
+                )
+                
+                if success:
+                    monthly_impact = calculate_monthly_equivalent(income_amount, income_frequency)
+                    daily_impact = monthly_impact / 30
+                    weekly_impact = monthly_impact / 4.33
+                    yearly_impact = monthly_impact * 12
+                    
+                    st.success(f"✅ Recurring income added: **{income_category}** - ₹{income_amount:,.0f} ({income_frequency})")
+                    
+                    # Show impact breakdown
+                    st.markdown("##### 💰 Financial Impact Breakdown")
+                    impact_col1, impact_col2, impact_col3, impact_col4 = st.columns(4)
+                    
+                    with impact_col1:
+                        st.metric("📅 Daily", f"₹{daily_impact:,.0f}")
+                    
+                    with impact_col2:
+                        st.metric("🗓️ Weekly", f"₹{weekly_impact:,.0f}")
+                    
+                    with impact_col3:
+                        st.metric("📆 Monthly", f"₹{monthly_impact:,.0f}")
+                    
+                    with impact_col4:
+                        st.metric("📅 Yearly", f"₹{yearly_impact:,.0f}")
+                    
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("❌ Error adding recurring income")
+
+# ===== EXPENSE TAB =====
+with expense_tab:
+    with st.form("add_recurring_expense_form", clear_on_submit=True):
+        st.markdown("##### Recurring Expense Details")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            expense_category = st.selectbox(
+                "Expense Category*", 
                 EXPENSE_CATEGORIES,
                 help="Select the type of recurring expense"
             )
-    
-    with col2:
-        amount = st.number_input(
-            "Amount (₹)*", 
-            min_value=0.0, 
-            value=5000.0, 
-            step=100.0,
-            help="Amount for each occurrence",
-            key="amount_input"  # For real-time update
-        )
-    
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        frequency = st.selectbox(
-            "Frequency*",
-            ["Daily", "Weekly", "Monthly", "3 Months", "6 Months", "Yearly"],  # UPDATED: Added 3 & 6 months
-            index=2,
-            help="How often this transaction occurs",
-            key="frequency_input"  # For real-time update
-        )
-    
-    with col4:
-        start_date = st.date_input(
-            "Start Date*",
-            value=datetime.now().date(),
-            help="When should this recurring transaction start?"
-        )
-    
-    description = st.text_area(
-        "Description (Optional)",
-        placeholder="e.g., Monthly salary from ABC Company",
-        help="Add any additional notes about this recurring transaction"
-    )
-    
-    # REAL-TIME AMOUNT UPDATE (changes as you type!)
-    if amount > 0:
-        monthly_equiv = calculate_monthly_equivalent(amount, frequency)
-        daily_equiv = monthly_equiv / 30
-        weekly_equiv = monthly_equiv / 4.33
-        yearly_equiv = monthly_equiv * 12
         
-        st.markdown("##### 💰 Impact Analysis (Real-Time)")
-        
-        # Create 4 columns for breakdown
-        impact_col1, impact_col2, impact_col3, impact_col4 = st.columns(4)
-        
-        with impact_col1:
-            st.metric("📅 Daily", f"₹{daily_equiv:,.0f}")
-        
-        with impact_col2:
-            st.metric("🗓️ Weekly", f"₹{weekly_equiv:,.0f}")
-        
-        with impact_col3:
-            st.metric("📆 Monthly", f"₹{monthly_equiv:,.0f}")
-        
-        with impact_col4:
-            st.metric("🗓️ Yearly", f"₹{yearly_equiv:,.0f}")
-        
-        # Show selected frequency impact in colored box
-        if frequency == "Daily":
-            st.info(f"💡 **You selected Daily:** This will cost ₹{amount:,.0f}/day or ₹{monthly_equiv:,.0f}/month")
-        elif frequency == "Weekly":
-            st.info(f"💡 **You selected Weekly:** This will cost ₹{amount:,.0f}/week or ₹{monthly_equiv:,.0f}/month")
-        elif frequency == "Monthly":
-            st.info(f"💡 **You selected Monthly:** This will cost ₹{amount:,.0f}/month")
-        elif frequency == "3 Months":
-            st.info(f"💡 **You selected 3 Months:** This will cost ₹{amount:,.0f} every 3 months or ₹{monthly_equiv:,.0f}/month")
-        elif frequency == "6 Months":
-            st.info(f"💡 **You selected 6 Months:** This will cost ₹{amount:,.0f} every 6 months or ₹{monthly_equiv:,.0f}/month")
-        elif frequency == "Yearly":
-            st.info(f"💡 **You selected Yearly:** This will cost ₹{amount:,.0f}/year or ₹{monthly_equiv:,.0f}/month")
-    
-    submit_recurring = st.form_submit_button("💾 Add Recurring Transaction", use_container_width=True, type="primary")
-    
-    if submit_recurring:
-        if amount <= 0:
-            st.error("❌ Amount must be greater than 0")
-        else:
-            # Add to database
-            success = add_recurring_transaction(
-                user_id=user_id,
-                trans_type=transaction_type,
-                category=category,
-                amount=amount,
-                frequency=frequency,
-                start_date=start_date,
-                description=description
+        with col2:
+            expense_amount = st.number_input(
+                "Amount (₹)*", 
+                min_value=0.0, 
+                value=5000.0, 
+                step=100.0,
+                help="Amount for each occurrence",
+                key="expense_amount"
             )
-            
-            if success:
-                monthly_impact = calculate_monthly_equivalent(amount, frequency)
-                st.success(f"✅ Recurring {transaction_type.lower()} added: **{category}** - ₹{amount:,.0f} ({frequency})")
-                st.info(f"💰 Monthly impact: ₹{monthly_impact:,.0f}")
-                st.balloons()
-                st.rerun()
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            expense_frequency = st.selectbox(
+                "Frequency*",
+                ["Daily", "Weekly", "Monthly", "3 Months", "6 Months", "Yearly"],
+                index=2,
+                help="How often this expense occurs",
+                key="expense_frequency"
+            )
+        
+        with col4:
+            expense_start_date = st.date_input(
+                "Start Date*",
+                value=datetime.now().date(),
+                help="When should this recurring expense start?",
+                key="expense_start_date"
+            )
+        
+        expense_description = st.text_area(
+            "Description (Optional)",
+            placeholder="e.g., Monthly rent payment",
+            help="Add any additional notes",
+            key="expense_description"
+        )
+        
+        submit_expense = st.form_submit_button("💾 Add Recurring Expense", use_container_width=True, type="primary")
+        
+        if submit_expense:
+            if expense_amount <= 0:
+                st.error("❌ Amount must be greater than 0")
             else:
-                st.error("❌ Error adding recurring transaction")
+                success = add_recurring_transaction(
+                    user_id=user_id,
+                    trans_type="Expense",
+                    category=expense_category,
+                    amount=expense_amount,
+                    frequency=expense_frequency,
+                    start_date=expense_start_date,
+                    description=expense_description
+                )
+                
+                if success:
+                    monthly_impact = calculate_monthly_equivalent(expense_amount, expense_frequency)
+                    daily_impact = monthly_impact / 30
+                    weekly_impact = monthly_impact / 4.33
+                    yearly_impact = monthly_impact * 12
+                    
+                    st.success(f"✅ Recurring expense added: **{expense_category}** - ₹{expense_amount:,.0f} ({expense_frequency})")
+                    
+                    # Show impact breakdown
+                    st.markdown("##### 💸 Financial Impact Breakdown")
+                    impact_col1, impact_col2, impact_col3, impact_col4 = st.columns(4)
+                    
+                    with impact_col1:
+                        st.metric("📅 Daily", f"₹{daily_impact:,.0f}")
+                    
+                    with impact_col2:
+                        st.metric("🗓️ Weekly", f"₹{weekly_impact:,.0f}")
+                    
+                    with impact_col3:
+                        st.metric("📆 Monthly", f"₹{monthly_impact:,.0f}")
+                    
+                    with impact_col4:
+                        st.metric("📅 Yearly", f"₹{yearly_impact:,.0f}")
+                    
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("❌ Error adding recurring expense")
 
-# ===== SECTION 2: RECURRING TRANSACTIONS OVERVIEW (NOW BELOW FORM!) =====
+# ===== SECTION 2: RECURRING TRANSACTIONS OVERVIEW =====
 st.markdown("---")
 st.subheader("📊 Your Recurring Transactions")
 
