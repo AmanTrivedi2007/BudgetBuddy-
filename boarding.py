@@ -1,9 +1,10 @@
-# boarding.py - FIXED VERSION WITH PROPER CALLBACKS
+# boarding.py - FINAL VERSION WITH DATABASE PERSISTENCE
 
 import streamlit as st
 import time
+from database import save_user_preference, get_user_preference, delete_user_preference
 
-# Callback functions for navigation (CRITICAL: These run BEFORE the page renders)
+# Callback functions for navigation (These run BEFORE the page renders)
 def next_step():
     """Increment step counter"""
     st.session_state.onboarding_step += 1
@@ -13,12 +14,20 @@ def prev_step():
     st.session_state.onboarding_step -= 1
 
 def skip_tutorial():
-    """Skip and complete tutorial"""
+    """Skip and complete tutorial - saves to database"""
+    # Save to database for persistence
+    if 'username' in st.session_state:
+        save_user_preference(st.session_state.username, 'onboarding_completed', 'true')
+    
     st.session_state.onboarding_completed = True
     st.session_state.onboarding_step = 0
 
 def finish_tutorial():
-    """Complete the tutorial"""
+    """Complete the tutorial - saves to database"""
+    # Save to database for persistence
+    if 'username' in st.session_state:
+        save_user_preference(st.session_state.username, 'onboarding_completed', 'true')
+    
     st.session_state.onboarding_completed = True
     st.session_state.onboarding_step = 0
     st.session_state.show_completion = True
@@ -26,16 +35,27 @@ def finish_tutorial():
 def show_onboarding_tutorial():
     """
     Display interactive onboarding tutorial for new users.
-    Call this function from App.py after successful login.
+    Checks database for completion status - shows only once per user.
     
     Returns:
         bool: True if showing tutorial, False if completed
     """
-    # Initialize session state for onboarding
+    # Check if user is logged in
+    if 'username' not in st.session_state:
+        return False
+    
+    username = st.session_state.username
+    
+    # Check database for tutorial completion status
+    tutorial_completed_db = get_user_preference(username, 'onboarding_completed', 'false')
+    
+    # Initialize session state from database
     if 'onboarding_completed' not in st.session_state:
-        st.session_state.onboarding_completed = False
+        st.session_state.onboarding_completed = (tutorial_completed_db == 'true')
+    
     if 'onboarding_step' not in st.session_state:
         st.session_state.onboarding_step = 0
+    
     if 'show_completion' not in st.session_state:
         st.session_state.show_completion = False
     
@@ -47,7 +67,7 @@ def show_onboarding_tutorial():
         st.session_state.show_completion = False
         st.rerun()
     
-    # Don't show if already completed
+    # Don't show if already completed (from database)
     if st.session_state.onboarding_completed:
         return False
     
@@ -71,7 +91,7 @@ BudgetBuddy helps you:
 Let's take a quick 2-minute tour to get you started! 🚀
             """,
             "tips": [
-                "✅ This tutorial appears only once",
+                "✅ This tutorial appears only once per account",
                 "✅ You can skip anytime",
                 "✅ Takes less than 2 minutes"
             ]
@@ -277,7 +297,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
     
     # Safety check: prevent out of bounds
     if current_step >= len(steps):
-        st.session_state.onboarding_completed = True
+        finish_tutorial()
         return False
     
     step = steps[current_step]
@@ -286,11 +306,6 @@ Let's take a quick 2-minute tour to get you started! 🚀
     # Custom CSS for styling
     st.markdown("""
     <style>
-        .onboarding-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-        }
         .emoji-display {
             font-size: 80px;
             text-align: center;
@@ -341,11 +356,6 @@ Let's take a quick 2-minute tour to get you started! 🚀
             margin: 10px 0;
             font-weight: bold;
         }
-        .stButton button {
-            font-size: 16px;
-            font-weight: bold;
-            padding: 12px 24px;
-        }
     </style>
     """, unsafe_allow_html=True)
     
@@ -379,7 +389,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
         
         st.markdown("---")
         
-        # Navigation buttons with CALLBACKS (this is the fix!)
+        # Navigation buttons with CALLBACKS (this prevents step skipping!)
         col1, col2, col3 = st.columns([1, 2, 1])
         
         with col1:
@@ -387,7 +397,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
                 st.button(
                     "⬅️ Previous", 
                     key=f"prev_{current_step}",
-                    on_click=prev_step,  # Using callback instead of if statement
+                    on_click=prev_step,  # Callback ensures clean state update
                     use_container_width=True,
                     type="secondary"
                 )
@@ -398,7 +408,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
             st.button(
                 "⏭️ Skip Tutorial", 
                 key=f"skip_{current_step}",
-                on_click=skip_tutorial,  # Using callback instead of if statement
+                on_click=skip_tutorial,  # Callback with database save
                 use_container_width=True,
                 type="secondary"
             )
@@ -408,7 +418,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
                 st.button(
                     "Next ➡️", 
                     key=f"next_{current_step}",
-                    on_click=next_step,  # Using callback instead of if statement
+                    on_click=next_step,  # Callback ensures clean state update
                     use_container_width=True,
                     type="primary"
                 )
@@ -416,7 +426,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
                 st.button(
                     "🎉 Get Started!", 
                     key=f"finish_{current_step}",
-                    on_click=finish_tutorial,  # Using callback instead of if statement
+                    on_click=finish_tutorial,  # Callback with database save
                     use_container_width=True,
                     type="primary"
                 )
@@ -424,9 +434,12 @@ Let's take a quick 2-minute tour to get you started! 🚀
     return True
 
 
-# Function to reset onboarding (for testing/debugging)
+# Function to reset onboarding (for testing/manual reset)
 def reset_onboarding():
-    """Reset onboarding to show tutorial again"""
+    """Reset onboarding - deletes from database and session state"""
+    if 'username' in st.session_state:
+        delete_user_preference(st.session_state.username, 'onboarding_completed')
+    
     st.session_state.onboarding_completed = False
     st.session_state.onboarding_step = 0
     if 'show_completion' in st.session_state:
