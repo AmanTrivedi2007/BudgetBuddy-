@@ -5,9 +5,6 @@ import sqlite3
 import re
 import secrets
 import time
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 DB_FILE = "budgetbuddy.db"
 
@@ -56,62 +53,6 @@ def verify_password(password, stored_hash, salt):
     password_hash, _ = hash_password(password, salt)
     return password_hash == stored_hash
 
-def send_username_email(email, username, full_name):
-    """Send username to user's email"""
-    try:
-        # NOTE: Configure these with your SMTP settings
-        # For now, we'll just show a success message
-        # In production, use Gmail SMTP or SendGrid
-        
-        # Example Gmail SMTP configuration:
-        # smtp_server = "smtp.gmail.com"
-        # smtp_port = 587
-        # sender_email = "your-email@gmail.com"
-        # sender_password = "your-app-password"
-        
-        # For demonstration, we'll just return success
-        # In production, uncomment this code:
-        
-        """
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = email
-        msg['Subject'] = "Welcome to BudgetBuddy - Your Username"
-        
-        body = f
-
-Hello {full_name},
-
-Welcome to BudgetBuddy! 🎉
-
-Your account has been created successfully.
-
-Your Username: {username}
-
-IMPORTANT: Please save this username. You'll need it to login.
-
-Login at: [Your App URL]
-
-Thank you for choosing BudgetBuddy!
-
-Best regards,
-BudgetBuddy Team
-        "        
-        msg.attach(MIMEText(body, 'plain'))
-        
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        text = msg.as_string()
-        server.sendmail(sender_email, email, text)
-        server.quit()
-        """
-        
-        return True
-    except Exception as e:
-        st.error(f"Email sending failed: {str(e)}")
-        return False
-
 def check_username_exists(username):
     """Check if username already exists"""
     username_hash = hash_username(username)
@@ -138,7 +79,6 @@ def create_user(full_name, username, password, email):
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        # Hash everything
         username_hash = hash_username(username)
         password_hash, salt = hash_password(password)
         email_hash = hash_email(email)
@@ -179,12 +119,10 @@ def check_rate_limit(username):
         locked_until = attempts_data['locked_until']
         
         if attempts >= 5 and locked_until:
-            # Check if still locked
             if time.time() < locked_until:
                 minutes_left = int((locked_until - time.time()) / 60)
                 return False, minutes_left
             else:
-                # Lock expired, reset attempts
                 from database import reset_login_attempts
                 reset_login_attempts(username)
     
@@ -201,10 +139,9 @@ def record_failed_attempt(username):
     else:
         new_attempts = 1
     
-    # Lock for 15 minutes after 5 failed attempts
     locked_until = None
     if new_attempts >= 5:
-        locked_until = time.time() + 900  # 15 minutes
+        locked_until = time.time() + 900
     
     update_login_attempts(username, new_attempts, locked_until)
 
@@ -226,12 +163,18 @@ def check_authentication():
         st.session_state.auth_mode = 'login'
     if 'login_time' not in st.session_state:
         st.session_state.login_time = None
+    if 'signup_success' not in st.session_state:
+        st.session_state.signup_success = False
+    if 'new_username' not in st.session_state:
+        st.session_state.new_username = ""
+    if 'new_email' not in st.session_state:
+        st.session_state.new_email = ""
     
     # Session timeout check
     if st.session_state.username:
         if st.session_state.login_time:
             elapsed = time.time() - st.session_state.login_time
-            if elapsed > 1800:  # 30 minutes
+            if elapsed > 1800:
                 st.session_state.username = None
                 st.session_state.full_name = None
                 st.session_state.login_time = None
@@ -264,11 +207,13 @@ def check_authentication():
         if st.button("🔐 Login", use_container_width=True, 
                     type="primary" if st.session_state.auth_mode == 'login' else "secondary"):
             st.session_state.auth_mode = 'login'
+            st.session_state.signup_success = False
             st.rerun()
     with col2:
         if st.button("✍️ Sign Up", use_container_width=True,
                     type="primary" if st.session_state.auth_mode == 'signup' else "secondary"):
             st.session_state.auth_mode = 'signup'
+            st.session_state.signup_success = False
             st.rerun()
     
     st.markdown("---")
@@ -277,67 +222,77 @@ def check_authentication():
     if st.session_state.auth_mode == 'signup':
         st.subheader("✍️ Create New Account")
         
-        with st.form("signup_form", clear_on_submit=True):
-            full_name = st.text_input("Full Name*", placeholder="e.g., Rahul Kumar")
-            username = st.text_input("Choose Username*", placeholder="e.g., rahulk or rahul_kumar",
-                                    help="Create your own unique username (letters, numbers, underscore only)")
-            email = st.text_input("Email*", placeholder="your-email@example.com",
-                                 help="Required - Your username will be sent to this email")
-            password = st.text_input("Password*", type="password",
-                                    help="Minimum 6 characters")
-            confirm_password = st.text_input("Confirm Password*", type="password")
+        # Show success message if signup completed
+        if st.session_state.signup_success:
+            st.success(f"✅ Account created successfully!")
+            st.info(f"🔑 **Your Username:** `{st.session_state.new_username}`")
+            st.info(f"📧 **Email:** {st.session_state.new_email}")
+            st.warning("⚠️ **IMPORTANT:** Save your username! You'll need it to login.")
+            st.balloons()
             
-            signup_submitted = st.form_submit_button("🚀 Create Account", use_container_width=True)
+            st.code(st.session_state.new_username, language="text")
             
-            if signup_submitted:
-                # Validation
-                if not full_name or len(full_name.strip()) < 2:
-                    st.error("❌ Please enter your full name (minimum 2 characters)")
-                elif not username or len(username.strip()) < 3:
-                    st.error("❌ Username must be at least 3 characters")
-                elif not re.match(r'^[a-zA-Z0-9_]+$', username):
-                    st.error("❌ Username can only contain letters, numbers, and underscore")
-                elif not email:
-                    st.error("❌ Email is required")
-                elif not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
-                    st.error("❌ Invalid email format")
-                elif len(password) < 6:
-                    st.error("❌ Password must be at least 6 characters")
-                elif password != confirm_password:
-                    st.error("❌ Passwords don't match")
-                elif check_username_exists(username):
-                    st.error("❌ This username is already taken. Please choose another.")
-                elif check_email_exists(email):
-                    st.error("❌ This email is already registered. Please use a different email.")
-                else:
-                    # Create user
-                    if create_user(full_name, username, password, email):
-                        # Send email (simulated)
-                        send_username_email(email, username, full_name)
-                        
-                        st.success(f"✅ Account created successfully!")
-                        st.info(f"🔑 **Your Username:** `{username}`")
-                        st.info(f"📧 **Confirmation sent to:** {email}")
-                        st.warning("⚠️ **IMPORTANT:** Save your username! You'll need it to login.")
-                        st.balloons()
-                        
-                        # Show username prominently
-                        st.code(username, language="text")
-                        
-                        st.markdown("---")
-                        if st.button("➡️ Go to Login Page", use_container_width=True, type="primary"):
-                            st.session_state.auth_mode = 'login'
-                            st.rerun()
+            st.markdown("---")
+            # Button OUTSIDE form
+            if st.button("➡️ Go to Login Page", use_container_width=True, type="primary"):
+                st.session_state.auth_mode = 'login'
+                st.session_state.signup_success = False
+                st.rerun()
+            
+            st.info("""
+            💡 **Security Features:**
+            - Your username is encrypted with SHA-256
+            - Your password is encrypted with SHA-256 + unique salt
+            - Your email is encrypted with SHA-256
+            """)
+        else:
+            # Show signup form
+            with st.form("signup_form", clear_on_submit=True):
+                full_name = st.text_input("Full Name*", placeholder="e.g., Rahul Kumar")
+                username = st.text_input("Choose Username*", placeholder="e.g., rahulk or rahul_kumar",
+                                        help="Create your own unique username (letters, numbers, underscore only)")
+                email = st.text_input("Email*", placeholder="your-email@example.com",
+                                     help="Required - For account recovery")
+                password = st.text_input("Password*", type="password",
+                                        help="Minimum 6 characters")
+                confirm_password = st.text_input("Confirm Password*", type="password")
+                
+                signup_submitted = st.form_submit_button("🚀 Create Account", use_container_width=True)
+                
+                if signup_submitted:
+                    if not full_name or len(full_name.strip()) < 2:
+                        st.error("❌ Please enter your full name (minimum 2 characters)")
+                    elif not username or len(username.strip()) < 3:
+                        st.error("❌ Username must be at least 3 characters")
+                    elif not re.match(r'^[a-zA-Z0-9_]+$', username):
+                        st.error("❌ Username can only contain letters, numbers, and underscore")
+                    elif not email:
+                        st.error("❌ Email is required")
+                    elif not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+                        st.error("❌ Invalid email format")
+                    elif len(password) < 6:
+                        st.error("❌ Password must be at least 6 characters")
+                    elif password != confirm_password:
+                        st.error("❌ Passwords don't match")
+                    elif check_username_exists(username):
+                        st.error("❌ This username is already taken. Please choose another.")
+                    elif check_email_exists(email):
+                        st.error("❌ This email is already registered. Please use a different email.")
                     else:
-                        st.error("❌ Error creating account. Please try again.")
-        
-        st.info("""
-        💡 **Security Features:**
-        - Your username is encrypted with SHA-256
-        - Your password is encrypted with SHA-256 + unique salt
-        - Your email is encrypted with SHA-256
-        - Your username will be sent to your email
-        """)
+                        if create_user(full_name, username, password, email):
+                            st.session_state.signup_success = True
+                            st.session_state.new_username = username
+                            st.session_state.new_email = email
+                            st.rerun()
+                        else:
+                            st.error("❌ Error creating account. Please try again.")
+            
+            st.info("""
+            💡 **How it works:**
+            - Choose your own username
+            - Your username and email will be encrypted
+            - You'll use your username to login
+            """)
     
     # LOGIN MODE
     else:
@@ -385,7 +340,7 @@ def check_authentication():
                             
                             st.error("❌ Invalid username or password")
         
-        st.info("💡 **Don't have an account?** Click 'Sign Up' above!\n\n📧 **Forgot username?** Check your email for your username confirmation.")
+        st.info("💡 **Don't have an account?** Click 'Sign Up' above!")
     
     # Footer
     st.markdown("---")
@@ -405,6 +360,6 @@ def check_authentication():
     st.caption("📧 Email: SHA-256 hashed")
     st.caption("👤 Username: SHA-256 hashed")
     st.caption("⏱️ Auto-logout: 30 minutes")
-    st.caption("🚫 Rate limiting: 5 attempts per 15 minutes (stored in database)")
+    st.caption("🚫 Rate limiting: 5 attempts per 15 minutes")
     
     st.stop()
