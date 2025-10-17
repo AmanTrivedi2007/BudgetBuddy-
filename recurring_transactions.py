@@ -29,8 +29,8 @@ from database import (
     add_recurring_transaction,
     delete_recurring_transaction,
     process_recurring_transactions,
-    get_all_income,      # ADDED: Import for database sync
-    get_all_expenses     # ADDED: Import for database sync
+    get_all_income,      # ← ADDED: For database sync
+    get_all_expenses     # ← ADDED: For database sync
 )
 
 # ===== PROCESS PENDING RECURRING TRANSACTIONS =====
@@ -91,13 +91,11 @@ def display_transaction_card(transaction, trans_type):
 # ===== FETCH ALL DATA =====
 recurring_transactions = get_all_recurring_transactions(user_id)
 
-# CRITICAL FIX: Get income and expenses from DATABASE instead of session state
-all_income_data = get_all_income(user_id)      # CHANGED: Fetch from database
-all_expenses_data = get_all_expenses(user_id)  # CHANGED: Fetch from database
-
-# Calculate totals from DATABASE
-total_income = sum(item['amount'] for item in all_income_data)      # CHANGED: Use database data
-total_expenses = sum(item['amount'] for item in all_expenses_data)  # CHANGED: Use database data
+# ← CHANGED: Get from database instead of session_state
+all_income_data = get_all_income(user_id)
+all_expenses_data = get_all_expenses(user_id)
+total_income = sum(item['amount'] for item in all_income_data)
+total_expenses = sum(item['amount'] for item in all_expenses_data)
 
 # Separate recurring transactions by type
 recurring_income = [t for t in recurring_transactions if t['type'] == 'Income']
