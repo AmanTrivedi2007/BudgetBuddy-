@@ -124,7 +124,7 @@ def check_authentication():
     if st.session_state.username:
         return st.session_state.username
     
-    # Show login/signup page
+    # Show login/signup page with beautiful styling
     st.markdown("""
         <style>
         .auth-container {
@@ -135,10 +135,27 @@ def check_authentication():
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
+        .big-title {
+            font-size: 48px !important;
+            font-weight: bold;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stButton>button {
+            border-radius: 10px !important;
+            font-weight: bold !important;
+            transition: all 0.3s !important;
+        }
+        .stButton>button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important;
+        }
         </style>
     """, unsafe_allow_html=True)
     
-    st.title("💰 Welcome to BudgetBuddy")
+    st.markdown('<p class="big-title">💰 BudgetBuddy</p>', unsafe_allow_html=True)
     st.markdown("### Your Personal Finance Companion")
     st.markdown("---")
     
@@ -162,11 +179,14 @@ def check_authentication():
         st.subheader("✍️ Create New Account")
         
         with st.form("signup_form", clear_on_submit=True):
-            full_name = st.text_input("Full Name*", placeholder="e.g., Rahul Kumar")
-            email = st.text_input("Email (optional)", placeholder="rahul@example.com")
-            password = st.text_input("Password*", type="password", 
-                                    help="Minimum 6 characters")
-            confirm_password = st.text_input("Confirm Password*", type="password")
+            full_name = st.text_input("Full Name*", placeholder="e.g., Rahul Kumar",
+                                      help="Enter your complete name")
+            email = st.text_input("Email (optional)", placeholder="rahul@example.com",
+                                 help="For future account recovery features")
+            password = st.text_input("Password*", type="password",
+                                    help="Minimum 6 characters - Choose a strong password")
+            confirm_password = st.text_input("Confirm Password*", type="password",
+                                           help="Re-enter your password")
             
             signup_submitted = st.form_submit_button("🚀 Create Account", use_container_width=True)
             
@@ -188,26 +208,35 @@ def check_authentication():
                     if create_user(full_name, generated_username, password, email):
                         st.success(f"✅ Account created successfully!")
                         st.info(f"🔑 **Your Username:** `{generated_username}`")
-                        st.warning("⚠️ **Important:** Remember your username for login!")
+                        st.warning("⚠️ **IMPORTANT:** Save this username! You'll need it to login.")
                         st.balloons()
                         
-                        # Auto-switch to login after 3 seconds
+                        # Show copy button for username
+                        st.code(generated_username, language="text")
+                        
                         st.markdown("---")
-                        if st.button("➡️ Go to Login Page", use_container_width=True):
+                        if st.button("➡️ Go to Login Page", use_container_width=True, type="primary"):
                             st.session_state.auth_mode = 'login'
                             st.rerun()
                     else:
-                        st.error("❌ Error creating account. Username may already exist.")
+                        st.error("❌ Error creating account. Please try a different name.")
         
-        st.info("💡 **How it works:**\n- Enter your name → We generate a unique username\n- Choose a secure password (min 6 characters)\n- Use your generated username to login")
+        st.info("""
+        💡 **How Username Generation Works:**
+        - "Rahul Kumar" → username: `rahulk`
+        - "Priya" → username: `priya`
+        - If username exists, adds number: `rahulk1`, `rahulk2`
+        """)
     
     # LOGIN MODE
     else:
         st.subheader("🔐 Login to Your Account")
         
         with st.form("login_form", clear_on_submit=False):
-            username_input = st.text_input("Username*", placeholder="Enter your username")
-            password_input = st.text_input("Password*", type="password")
+            username_input = st.text_input("Username*", placeholder="Enter your username",
+                                          help="The username generated during signup")
+            password_input = st.text_input("Password*", type="password",
+                                          help="Your account password")
             
             col1, col2, col3 = st.columns([1, 1, 1])
             with col2:
@@ -228,6 +257,7 @@ def check_authentication():
                         st.rerun()
                     else:
                         st.error("❌ Invalid username or password")
+                        st.warning("💡 Make sure you're using the correct username and password")
         
         st.info("💡 **Don't have an account?** Click 'Sign Up' above to create one!")
     
@@ -249,7 +279,8 @@ def check_authentication():
         st.caption("Analyze spending patterns")
     
     st.markdown("---")
-    st.caption("🔒 Your password is encrypted with SHA-256")
+    st.caption("🔒 Your password is encrypted with SHA-256 + Salt")
+    st.caption("🛡️ Each user has isolated, private data")
     
     # Stop here until logged in
     st.stop()
