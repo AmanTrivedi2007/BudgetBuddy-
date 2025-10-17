@@ -4,8 +4,12 @@ import hashlib
 import sqlite3
 import re
 import secrets
+import time
 
 DB_FILE = "budgetbuddy.db"
+
+# Track failed login attempts
+LOGIN_ATTEMPTS = {}
 
 def init_users_table():
     """Create users table if it doesn't exist"""
@@ -27,7 +31,6 @@ def init_users_table():
 
 def generate_unique_username(full_name):
     """Generate a unique username from full name"""
-    # Clean name: remove special chars, convert to lowercase
     clean_name = re.sub(r'[^a-zA-Z0-9\s]', '', full_name).lower()
     parts = clean_name.split()
     
@@ -36,10 +39,8 @@ def generate_unique_username(full_name):
     elif len(parts) == 1:
         base_username = parts[0]
     else:
-        # First name + first letter of last name
         base_username = parts[0] + parts[-1][0]
     
-    # Check if username exists, add number if needed
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
@@ -59,10 +60,8 @@ def generate_unique_username(full_name):
 def hash_password(password, salt=None):
     """Hash password using SHA-256 with salt"""
     if salt is None:
-        # Generate random salt (16 bytes = 32 hex characters)
         salt = secrets.token_hex(16)
     
-    # Combine password and salt, then hash
     password_salt = password + salt
     password_hash = hashlib.sha256(password_salt.encode('utf-8')).hexdigest()
     
@@ -79,7 +78,6 @@ def create_user(full_name, username, password, email=None):
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        # Hash password with random salt
         password_hash, salt = hash_password(password)
         
         cursor.execute('''
@@ -103,13 +101,38 @@ def authenticate_user(username, password):
     conn.close()
     
     if result and verify_password(password, result[0], result[1]):
-        return True, result[2]  # Return success and full name
+        return True, result[2]
     return False, None
+
+def check_rate_limit(username):
+    """Check if user exceeded login attempts"""
+    if username in LOGIN_ATTEMPTS:
+        attempts, last_time = LOGIN_ATTEMPTS[username]
+        if attempts >= 5:
+            # Block for 15 minutes
+            if time.time() - last_time < 900:
+                return False, int((900 - (time.time() - last_time)) / 60)
+            else:
+                # Reset after cooldown
+                LOGIN_ATTEMPTS[username] = (0, time.time())
+    return True, 0
+
+def record_failed_attempt(username):
+    """Record a failed login attempt"""
+    if username not in LOGIN_ATTEMPTS:
+        LOGIN_ATTEMPTS[username] = (1, time.time())
+    else:
+        attempts, _ = LOGIN_ATTEMPTS[username]
+        LOGIN_ATTEMPTS[username] = (attempts + 1, time.time())
+
+def reset_attempts(username):
+    """Reset login attempts after successful login"""
+    if username in LOGIN_ATTEMPTS:
+        del LOGIN_ATTEMPTS[username]
 
 def check_authentication():
     """Main authentication function with sign up and login"""
     
-    # Initialize users table
     init_users_table()
     
     # Initialize session state
@@ -119,22 +142,26 @@ def check_authentication():
         st.session_state.full_name = None
     if 'auth_mode' not in st.session_state:
         st.session_state.auth_mode = 'login'
+    if 'login_time' not in st.session_state:
+        st.session_state.login_time = None
     
-    # If already logged in, return username
+    # If already logged in, check session timeout
     if st.session_state.username:
+        # Check session timeout (30 minutes)
+        if st.session_state.login_time:
+            elapsed = time.time() - st.session_state.login_time
+            if elapsed > 1800:  # 30 minutes
+                st.session_state.username = None
+                st.session_state.full_name = None
+                st.session_state.login_time = None
+                st.warning("⏱️ Session expired for security. Please login again.")
+                st.rerun()
+        
         return st.session_state.username
     
-    # Show login/signup page with beautiful styling
+    # Show login/signup page
     st.markdown("""
         <style>
-        .auth-container {
-            max-width: 500px;
-            margin: 50px auto;
-            padding: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
         .big-title {
             font-size: 48px !important;
             font-weight: bold;
@@ -146,11 +173,6 @@ def check_authentication():
         .stButton>button {
             border-radius: 10px !important;
             font-weight: bold !important;
-            transition: all 0.3s !important;
-        }
-        .stButton>button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -191,7 +213,6 @@ def check_authentication():
             signup_submitted = st.form_submit_button("🚀 Create Account", use_container_width=True)
             
             if signup_submitted:
-                # Validation
                 if not full_name or len(full_name.strip()) < 2:
                     st.error("❌ Please enter your full name (minimum 2 characters)")
                 elif len(password) < 6:
@@ -201,17 +222,14 @@ def check_authentication():
                 elif email and not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
                     st.error("❌ Invalid email format")
                 else:
-                    # Generate unique username
                     generated_username = generate_unique_username(full_name)
                     
-                    # Create user
                     if create_user(full_name, generated_username, password, email):
                         st.success(f"✅ Account created successfully!")
                         st.info(f"🔑 **Your Username:** `{generated_username}`")
                         st.warning("⚠️ **IMPORTANT:** Save this username! You'll need it to login.")
                         st.balloons()
                         
-                        # Show copy button for username
                         st.code(generated_username, language="text")
                         
                         st.markdown("---")
@@ -246,18 +264,39 @@ def check_authentication():
                 if not username_input or not password_input:
                     st.error("❌ Please enter both username and password")
                 else:
-                    # Authenticate
-                    success, full_name = authenticate_user(username_input, password_input)
+                    # Check rate limiting
+                    allowed, minutes_left = check_rate_limit(username_input)
                     
-                    if success:
-                        st.session_state.username = username_input
-                        st.session_state.full_name = full_name
-                        st.success(f"✅ Welcome back, {full_name}! 👋")
-                        st.balloons()
-                        st.rerun()
+                    if not allowed:
+                        st.error(f"🚫 Too many failed attempts. Try again in {minutes_left} minutes.")
+                        st.warning("🔒 Your account is temporarily locked for security.")
                     else:
-                        st.error("❌ Invalid username or password")
-                        st.warning("💡 Make sure you're using the correct username and password")
+                        # Authenticate
+                        success, full_name = authenticate_user(username_input, password_input)
+                        
+                        if success:
+                            # Reset failed attempts
+                            reset_attempts(username_input)
+                            
+                            # Set session
+                            st.session_state.username = username_input
+                            st.session_state.full_name = full_name
+                            st.session_state.login_time = time.time()
+                            
+                            st.success(f"✅ Welcome back, {full_name}! 👋")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            # Record failed attempt
+                            record_failed_attempt(username_input)
+                            
+                            attempts = LOGIN_ATTEMPTS.get(username_input, (0, 0))[0]
+                            remaining = 5 - attempts
+                            
+                            st.error("❌ Invalid username or password")
+                            if remaining > 0:
+                                st.warning(f"⚠️ {remaining} attempts remaining before account lock.")
+                            st.info("💡 Make sure you're using the correct username and password")
         
         st.info("💡 **Don't have an account?** Click 'Sign Up' above to create one!")
     
@@ -281,6 +320,7 @@ def check_authentication():
     st.markdown("---")
     st.caption("🔒 Your password is encrypted with SHA-256 + Salt")
     st.caption("🛡️ Each user has isolated, private data")
+    st.caption("⏱️ Auto-logout after 30 minutes of inactivity")
+    st.caption("🚫 Rate limiting: 5 login attempts per 15 minutes")
     
-    # Stop here until logged in
     st.stop()
