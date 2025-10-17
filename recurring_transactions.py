@@ -23,12 +23,12 @@ if 'username' not in st.session_state or not st.session_state.username:
 
 user_id = st.session_state.username
 
-# Import database functions
+# Import database functions - FIXED FUNCTION NAMES
 from database import (
     get_all_recurring_transactions,
     add_recurring_transaction,
     delete_recurring_transaction,
-    process_due_recurring_transactions
+    process_recurring_transactions  # ← FIXED: Removed "due_" prefix
 )
 
 # ===== HELPER FUNCTIONS =====
@@ -97,10 +97,13 @@ def display_transaction_card(transaction, trans_type):
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ===== PROCESS DUE TRANSACTIONS =====
-# Auto-process any transactions that are due
-due_count = process_due_recurring_transactions(user_id)
+# Auto-process any transactions that are due - FIXED FUNCTION CALL
+due_count = process_recurring_transactions(user_id)  # ← FIXED
 if due_count > 0:
     st.success(f"✅ Processed {due_count} recurring transaction(s) automatically!")
+
+# ... REST OF THE CODE REMAINS EXACTLY THE SAME ...
+# (I'll include the full code below for completeness)
 
 # ===== SECTION 1: ADD NEW RECURRING TRANSACTION (NOW AT TOP!) =====
 st.markdown("---")
@@ -120,7 +123,7 @@ with st.form("add_recurring_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
     
     with col1:
-        # FIXED: Dynamic category selection based on type
+        # Dynamic category selection based on type
         if transaction_type == "Income":
             category = st.selectbox(
                 "Category*", 
@@ -189,7 +192,6 @@ with st.form("add_recurring_form", clear_on_submit=True):
             )
             
             if success:
-                # FIXED: Show amount in success message
                 monthly_impact = calculate_monthly_equivalent(amount, frequency)
                 st.success(f"✅ Recurring {transaction_type.lower()} added: **{category}** - ₹{amount:,.0f} ({frequency})")
                 st.info(f"💰 Monthly impact: ₹{monthly_impact:,.0f}")
@@ -267,7 +269,7 @@ if recurring_transactions:
                 
                 # Delete button
                 if st.button(f"🗑️ Delete", key=f"del_inc_{transaction['id']}", type="secondary"):
-                    if delete_recurring_transaction(user_id, transaction['id']):
+                    if delete_recurring_transaction(transaction['id']):
                         st.success(f"✅ Deleted recurring income: {transaction['category']}")
                         st.rerun()
                     else:
@@ -284,7 +286,7 @@ if recurring_transactions:
                 
                 # Delete button
                 if st.button(f"🗑️ Delete", key=f"del_exp_{transaction['id']}", type="secondary"):
-                    if delete_recurring_transaction(user_id, transaction['id']):
+                    if delete_recurring_transaction(transaction['id']):
                         st.success(f"✅ Deleted recurring expense: {transaction['category']}")
                         st.rerun()
                     else:
