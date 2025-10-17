@@ -23,12 +23,12 @@ if 'username' not in st.session_state or not st.session_state.username:
 
 user_id = st.session_state.username
 
-# Import database functions - FIXED FUNCTION NAMES
+# Import database functions
 from database import (
     get_all_recurring_transactions,
     add_recurring_transaction,
     delete_recurring_transaction,
-    process_recurring_transactions  # ← FIXED: Removed "due_" prefix
+    process_recurring_transactions
 )
 
 # ===== HELPER FUNCTIONS =====
@@ -97,13 +97,10 @@ def display_transaction_card(transaction, trans_type):
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ===== PROCESS DUE TRANSACTIONS =====
-# Auto-process any transactions that are due - FIXED FUNCTION CALL
-due_count = process_recurring_transactions(user_id)  # ← FIXED
+# Auto-process any transactions that are due
+due_count = process_recurring_transactions(user_id)
 if due_count > 0:
     st.success(f"✅ Processed {due_count} recurring transaction(s) automatically!")
-
-# ... REST OF THE CODE REMAINS EXACTLY THE SAME ...
-# (I'll include the full code below for completeness)
 
 # ===== SECTION 1: ADD NEW RECURRING TRANSACTION (NOW AT TOP!) =====
 st.markdown("---")
