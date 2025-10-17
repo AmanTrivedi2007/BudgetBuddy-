@@ -1,17 +1,51 @@
-# boarding.py - Fixed Onboarding Tutorial
+# boarding.py - FIXED VERSION WITH PROPER CALLBACKS
 
 import streamlit as st
+import time
+
+# Callback functions for navigation (CRITICAL: These run BEFORE the page renders)
+def next_step():
+    """Increment step counter"""
+    st.session_state.onboarding_step += 1
+
+def prev_step():
+    """Decrement step counter"""
+    st.session_state.onboarding_step -= 1
+
+def skip_tutorial():
+    """Skip and complete tutorial"""
+    st.session_state.onboarding_completed = True
+    st.session_state.onboarding_step = 0
+
+def finish_tutorial():
+    """Complete the tutorial"""
+    st.session_state.onboarding_completed = True
+    st.session_state.onboarding_step = 0
+    st.session_state.show_completion = True
 
 def show_onboarding_tutorial():
     """
     Display interactive onboarding tutorial for new users.
     Call this function from App.py after successful login.
+    
+    Returns:
+        bool: True if showing tutorial, False if completed
     """
     # Initialize session state for onboarding
     if 'onboarding_completed' not in st.session_state:
         st.session_state.onboarding_completed = False
     if 'onboarding_step' not in st.session_state:
         st.session_state.onboarding_step = 0
+    if 'show_completion' not in st.session_state:
+        st.session_state.show_completion = False
+    
+    # Show completion message if just finished
+    if st.session_state.show_completion:
+        st.balloons()
+        st.success("🎊 **Tutorial Completed!** Welcome to BudgetBuddy!")
+        time.sleep(2)
+        st.session_state.show_completion = False
+        st.rerun()
     
     # Don't show if already completed
     if st.session_state.onboarding_completed:
@@ -32,7 +66,7 @@ BudgetBuddy helps you:
 - 🎯 **Set Savings Goals** - Achieve your financial dreams
 - 💰 **Manage Budgets** - Never overspend again
 - 🔁 **Auto-add Recurring Transactions** - Save time on repetitive tasks
-- 📊 **Visualize Spending** - Beautiful charts and insights
+- 📊 **Visualize Spending** - Beautiful interactive charts and insights
 
 Let's take a quick 2-minute tour to get you started! 🚀
             """,
@@ -89,6 +123,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
 
 **4. Data Visualizations** 📊
 - Interactive Plotly charts with hover details
+- 20+ chart types (donut, treemap, waterfall, heatmap)
 - Spending trends over time
 - Category-wise breakdowns
             """,
@@ -239,10 +274,16 @@ Let's take a quick 2-minute tour to get you started! 🚀
     
     # Get current step
     current_step = st.session_state.onboarding_step
+    
+    # Safety check: prevent out of bounds
+    if current_step >= len(steps):
+        st.session_state.onboarding_completed = True
+        return False
+    
     step = steps[current_step]
     total_steps = len(steps)
     
-    # Create centered container with custom styling
+    # Custom CSS for styling
     st.markdown("""
     <style>
         .onboarding-container {
@@ -254,7 +295,7 @@ Let's take a quick 2-minute tour to get you started! 🚀
             font-size: 80px;
             text-align: center;
             margin: 20px 0;
-            animation: bounce 1s ease infinite;
+            animation: bounce 2s ease infinite;
         }
         @keyframes bounce {
             0%, 100% { transform: translateY(0); }
@@ -283,21 +324,27 @@ Let's take a quick 2-minute tour to get you started! 🚀
         }
         .progress-bar {
             background: #e0e0e0;
-            height: 8px;
-            border-radius: 4px;
+            height: 10px;
+            border-radius: 5px;
             margin: 30px 0;
             overflow: hidden;
         }
         .progress-fill {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
             height: 100%;
-            transition: width 0.3s ease;
+            transition: width 0.5s ease;
         }
         .step-counter {
             text-align: center;
             color: #666;
-            font-size: 1.1em;
+            font-size: 1.2em;
             margin: 10px 0;
+            font-weight: bold;
+        }
+        .stButton button {
+            font-size: 16px;
+            font-weight: bold;
+            padding: 12px 24px;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -332,40 +379,55 @@ Let's take a quick 2-minute tour to get you started! 🚀
         
         st.markdown("---")
         
-        # Navigation buttons
+        # Navigation buttons with CALLBACKS (this is the fix!)
         col1, col2, col3 = st.columns([1, 2, 1])
         
         with col1:
             if current_step > 0:
-                if st.button("⬅️ Previous", key=f"prev_{current_step}", use_container_width=True):
-                    st.session_state.onboarding_step -= 1
-                    st.rerun()
+                st.button(
+                    "⬅️ Previous", 
+                    key=f"prev_{current_step}",
+                    on_click=prev_step,  # Using callback instead of if statement
+                    use_container_width=True,
+                    type="secondary"
+                )
+            else:
+                st.empty()  # Placeholder to maintain layout
         
         with col2:
-            if st.button("⏭️ Skip Tutorial", key=f"skip_{current_step}", use_container_width=True):
-                st.session_state.onboarding_completed = True
-                st.session_state.onboarding_step = 0
-                st.rerun()
+            st.button(
+                "⏭️ Skip Tutorial", 
+                key=f"skip_{current_step}",
+                on_click=skip_tutorial,  # Using callback instead of if statement
+                use_container_width=True,
+                type="secondary"
+            )
         
         with col3:
             if current_step < total_steps - 1:
-                if st.button("Next ➡️", key=f"next_{current_step}", use_container_width=True):
-                    st.session_state.onboarding_step += 1
-                    st.rerun()
+                st.button(
+                    "Next ➡️", 
+                    key=f"next_{current_step}",
+                    on_click=next_step,  # Using callback instead of if statement
+                    use_container_width=True,
+                    type="primary"
+                )
             else:
-                if st.button("🎉 Get Started!", key=f"finish_{current_step}", use_container_width=True):
-                    st.session_state.onboarding_completed = True
-                    st.session_state.onboarding_step = 0
-                    st.success("🎊 Tutorial completed! Welcome to BudgetBuddy!")
-                    st.rerun()
+                st.button(
+                    "🎉 Get Started!", 
+                    key=f"finish_{current_step}",
+                    on_click=finish_tutorial,  # Using callback instead of if statement
+                    use_container_width=True,
+                    type="primary"
+                )
     
     return True
 
 
-# Optional: Function to reset onboarding (for testing)
+# Function to reset onboarding (for testing/debugging)
 def reset_onboarding():
     """Reset onboarding to show tutorial again"""
-    if 'onboarding_completed' in st.session_state:
-        st.session_state.onboarding_completed = False
-    if 'onboarding_step' in st.session_state:
-        st.session_state.onboarding_step = 0
+    st.session_state.onboarding_completed = False
+    st.session_state.onboarding_step = 0
+    if 'show_completion' in st.session_state:
+        del st.session_state.show_completion
