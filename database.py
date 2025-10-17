@@ -1,4 +1,4 @@
-# database.py - Complete Database with Budget, Recurring Transactions & All Original Features
+# database.py - Complete Database with Budget, Recurring Transactions, User Preferences & All Features
 
 import sqlite3
 import pandas as pd
@@ -11,7 +11,6 @@ import calendar
 DB_FILE = "budgetbuddy.db"
 
 # ===== DATABASE INITIALIZATION =====
-
 def init_database():
     """Initialize database - auto-migrates old schema to new"""
     # Check if database needs migration
@@ -47,9 +46,11 @@ def init_database():
                 cursor.execute("PRAGMA table_info(income)")
                 income_columns = [col[1] for col in cursor.fetchall()]
                 conn.close()
+                
                 if 'user_id' not in income_columns:
                     os.remove(DB_FILE)
                     print("✅ Old database format - recreating")
+                    
         except Exception as e:
             # Any error, just recreate
             try:
@@ -139,7 +140,7 @@ def init_database():
         )
     ''')
     
-    # NEW: Create budgets table
+    # Create budgets table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS budgets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -155,7 +156,7 @@ def init_database():
         )
     ''')
     
-    # NEW: Create recurring transactions table
+    # Create recurring transactions table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS recurring_transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,12 +172,23 @@ def init_database():
         )
     ''')
     
+    # NEW: Create user preferences table (for tutorial completion, dark mode, etc.)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_preferences (
+            user_id TEXT NOT NULL,
+            preference_key TEXT NOT NULL,
+            preference_value TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, preference_key)
+        )
+    ''')
+    
     conn.commit()
     conn.close()
     print("✅ Database initialized successfully")
 
-# ===== INCOME FUNCTIONS =====
 
+# ===== INCOME FUNCTIONS =====
 def add_income_to_db(user_id, source, amount, date, notes=""):
     """Add income record to database"""
     conn = sqlite3.connect(DB_FILE)
@@ -215,8 +227,8 @@ def delete_income_from_db(user_id, income_id):
     conn.commit()
     conn.close()
 
-# ===== EXPENSE FUNCTIONS =====
 
+# ===== EXPENSE FUNCTIONS =====
 def add_expense_to_db(user_id, category, amount, date, description=""):
     """Add expense record to database"""
     conn = sqlite3.connect(DB_FILE)
@@ -255,8 +267,8 @@ def delete_expense_from_db(user_id, expense_id):
     conn.commit()
     conn.close()
 
-# ===== GOAL FUNCTIONS =====
 
+# ===== GOAL FUNCTIONS =====
 def add_goal_to_db(user_id, name, target_amount, description=""):
     """Add new goal to database"""
     conn = sqlite3.connect(DB_FILE)
@@ -357,8 +369,8 @@ def delete_goal_from_db(user_id, goal_name):
     conn.commit()
     conn.close()
 
-# ===== LOGIN ATTEMPTS FUNCTIONS =====
 
+# ===== LOGIN ATTEMPTS FUNCTIONS =====
 def get_login_attempts(username):
     """Get login attempts from database"""
     username_hash = hashlib.sha256(username.lower().encode()).hexdigest()
@@ -394,8 +406,8 @@ def reset_login_attempts(username):
     conn.commit()
     conn.close()
 
-# ===== BUDGET MANAGEMENT FUNCTIONS (NEW) =====
 
+# ===== BUDGET MANAGEMENT FUNCTIONS =====
 def get_all_budgets(user_id):
     """Get all budgets for specific user"""
     conn = sqlite3.connect(DB_FILE)
@@ -474,8 +486,8 @@ def get_category_spending(user_id, category, month):
     conn.close()
     return result[0] if result[0] is not None else 0.0
 
-# ===== RECURRING TRANSACTIONS FUNCTIONS (NEW) =====
 
+# ===== RECURRING TRANSACTIONS FUNCTIONS =====
 def get_all_recurring_transactions(user_id):
     """Get all recurring transactions for user"""
     conn = sqlite3.connect(DB_FILE)
@@ -541,12 +553,11 @@ def get_recurring_transaction_by_id(transaction_id):
     return row
 
 def process_recurring_transactions(user_id):
-    """Process all pending recurring transactions - FIXED WITH 3 & 6 MONTHS SUPPORT"""
+    """Process all pending recurring transactions"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     today = datetime.now().date()
-    processed_count = 0  # ← FIXED: Track count
+    processed_count = 0
     
     # Get all recurring transactions that are due
     cursor.execute('''
@@ -561,7 +572,7 @@ def process_recurring_transactions(user_id):
         trans_id, trans_type, category, amount, frequency, next_date, description = trans
         
         # Add to income or expense
-        if trans_type == 'Income':  # ← FIXED: Capital I
+        if trans_type == 'Income':
             cursor.execute('''
                 INSERT INTO income (user_id, source, amount, date, notes)
                 VALUES (?, ?, ?, ?, ?)
@@ -572,16 +583,16 @@ def process_recurring_transactions(user_id):
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, category, amount, str(today), f"[Recurring] {description}"))
         
-        processed_count += 1  # ← FIXED: Increment
+        processed_count += 1
         
         # Calculate next date
         next_date_obj = datetime.strptime(next_date, '%Y-%m-%d').date()
         
-        if frequency == 'Daily':  # ← FIXED: Capital D
+        if frequency == 'Daily':
             new_next_date = next_date_obj + timedelta(days=1)
-        elif frequency == 'Weekly':  # ← FIXED: Capital W
+        elif frequency == 'Weekly':
             new_next_date = next_date_obj + timedelta(weeks=1)
-        elif frequency == 'Monthly':  # ← FIXED: Capital M
+        elif frequency == 'Monthly':
             # Add 1 month
             month = next_date_obj.month + 1
             year = next_date_obj.year
@@ -594,7 +605,7 @@ def process_recurring_transactions(user_id):
                 # Use last day of month
                 last_day = calendar.monthrange(year, month)[1]
                 new_next_date = next_date_obj.replace(year=year, month=month, day=last_day)
-        elif frequency == '3 Months':  # ← NEW: 3 Months support
+        elif frequency == '3 Months':
             # Add 3 months
             month = next_date_obj.month + 3
             year = next_date_obj.year
@@ -606,7 +617,7 @@ def process_recurring_transactions(user_id):
             except ValueError:
                 last_day = calendar.monthrange(year, month)[1]
                 new_next_date = next_date_obj.replace(year=year, month=month, day=last_day)
-        elif frequency == '6 Months':  # ← NEW: 6 Months support
+        elif frequency == '6 Months':
             # Add 6 months
             month = next_date_obj.month + 6
             year = next_date_obj.year
@@ -618,22 +629,70 @@ def process_recurring_transactions(user_id):
             except ValueError:
                 last_day = calendar.monthrange(year, month)[1]
                 new_next_date = next_date_obj.replace(year=year, month=month, day=last_day)
-        elif frequency == 'Yearly':  # ← FIXED: Capital Y
+        elif frequency == 'Yearly':
             new_next_date = next_date_obj.replace(year=next_date_obj.year + 1)
         else:
             new_next_date = next_date_obj
         
         # Update next_date
         cursor.execute('''
-            UPDATE recurring_transactions 
-            SET next_date = ? 
+            UPDATE recurring_transactions
+            SET next_date = ?
             WHERE id = ?
         ''', (str(new_next_date), trans_id))
     
     conn.commit()
     conn.close()
+    return processed_count
+
+
+# ===== USER PREFERENCES FUNCTIONS (NEW - FOR TUTORIAL PERSISTENCE) =====
+def save_user_preference(user_id, preference_key, preference_value):
+    """Save user preference to database"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
     
-    return processed_count  # ← FIXED: Return count!
+    cursor.execute("""
+        INSERT OR REPLACE INTO user_preferences (user_id, preference_key, preference_value, updated_at)
+        VALUES (?, ?, ?, ?)
+    """, (user_id, preference_key, preference_value, str(datetime.now())))
+    
+    conn.commit()
+    conn.close()
+
+
+def get_user_preference(user_id, preference_key, default_value=None):
+    """Get user preference from database"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT preference_value FROM user_preferences 
+        WHERE user_id = ? AND preference_key = ?
+    """, (user_id, preference_key))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    return result[0] if result else default_value
+
+
+def delete_user_preference(user_id, preference_key):
+    """Delete user preference from database"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        DELETE FROM user_preferences 
+        WHERE user_id = ? AND preference_key = ?
+    """, (user_id, preference_key))
+    
+    rows_affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    
+    return rows_affected > 0
+
 
 # Initialize database when module is imported
 init_database()
