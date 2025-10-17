@@ -541,12 +541,12 @@ def get_recurring_transaction_by_id(transaction_id):
     return row
 
 def process_recurring_transactions(user_id):
-    """Process all pending recurring transactions"""
+    """Process all pending recurring transactions - FIXED WITH 3 & 6 MONTHS SUPPORT"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
     today = datetime.now().date()
-    processed_count = 0  # ← ADDED: Track how many processed
+    processed_count = 0  # ← FIXED: Track count
     
     # Get all recurring transactions that are due
     cursor.execute('''
@@ -561,7 +561,7 @@ def process_recurring_transactions(user_id):
         trans_id, trans_type, category, amount, frequency, next_date, description = trans
         
         # Add to income or expense
-        if trans_type == 'Income':  # ← FIXED: Capital 'I'
+        if trans_type == 'Income':  # ← FIXED: Capital I
             cursor.execute('''
                 INSERT INTO income (user_id, source, amount, date, notes)
                 VALUES (?, ?, ?, ?, ?)
@@ -572,16 +572,16 @@ def process_recurring_transactions(user_id):
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, category, amount, str(today), f"[Recurring] {description}"))
         
-        processed_count += 1  # ← ADDED: Increment counter
+        processed_count += 1  # ← FIXED: Increment
         
         # Calculate next date
         next_date_obj = datetime.strptime(next_date, '%Y-%m-%d').date()
         
-        if frequency == 'Daily':  # ← FIXED: Capital 'D'
+        if frequency == 'Daily':  # ← FIXED: Capital D
             new_next_date = next_date_obj + timedelta(days=1)
-        elif frequency == 'Weekly':  # ← FIXED: Capital 'W'
+        elif frequency == 'Weekly':  # ← FIXED: Capital W
             new_next_date = next_date_obj + timedelta(weeks=1)
-        elif frequency == 'Monthly':  # ← FIXED: Capital 'M'
+        elif frequency == 'Monthly':  # ← FIXED: Capital M
             # Add 1 month
             month = next_date_obj.month + 1
             year = next_date_obj.year
@@ -591,11 +591,34 @@ def process_recurring_transactions(user_id):
             try:
                 new_next_date = next_date_obj.replace(year=year, month=month)
             except ValueError:
-                # Handle case where day doesn't exist in next month (e.g., Jan 31 -> Feb 31)
                 # Use last day of month
                 last_day = calendar.monthrange(year, month)[1]
                 new_next_date = next_date_obj.replace(year=year, month=month, day=last_day)
-        elif frequency == 'Yearly':  # ← FIXED: Capital 'Y'
+        elif frequency == '3 Months':  # ← NEW: 3 Months support
+            # Add 3 months
+            month = next_date_obj.month + 3
+            year = next_date_obj.year
+            while month > 12:
+                month -= 12
+                year += 1
+            try:
+                new_next_date = next_date_obj.replace(year=year, month=month)
+            except ValueError:
+                last_day = calendar.monthrange(year, month)[1]
+                new_next_date = next_date_obj.replace(year=year, month=month, day=last_day)
+        elif frequency == '6 Months':  # ← NEW: 6 Months support
+            # Add 6 months
+            month = next_date_obj.month + 6
+            year = next_date_obj.year
+            while month > 12:
+                month -= 12
+                year += 1
+            try:
+                new_next_date = next_date_obj.replace(year=year, month=month)
+            except ValueError:
+                last_day = calendar.monthrange(year, month)[1]
+                new_next_date = next_date_obj.replace(year=year, month=month, day=last_day)
+        elif frequency == 'Yearly':  # ← FIXED: Capital Y
             new_next_date = next_date_obj.replace(year=next_date_obj.year + 1)
         else:
             new_next_date = next_date_obj
@@ -610,7 +633,7 @@ def process_recurring_transactions(user_id):
     conn.commit()
     conn.close()
     
-    return processed_count  # ← ADDED: Return the count!
+    return processed_count  # ← FIXED: Return count!
 
 # Initialize database when module is imported
 init_database()
