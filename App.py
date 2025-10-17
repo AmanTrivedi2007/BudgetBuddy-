@@ -13,7 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Check authentication FIRST (shows login if not authenticated)
+# Check authentication FIRST
 username = check_authentication()
 
 # Define pages
@@ -26,11 +26,11 @@ page5 = st.Page("Description.py", title="About", icon="🆎")
 # Create navigation
 pg = st.navigation([page1, page2, page3, page4, page5], position="sidebar")
 
-# Sidebar header with user info
+# Sidebar with user info
 with st.sidebar:
     st.markdown("---")
     
-    # Show full name if available, otherwise just username
+    # Show full name if available
     if st.session_state.get('full_name'):
         st.markdown(f"### 👤 {st.session_state.full_name}")
         st.caption(f"@{username}")
@@ -39,13 +39,13 @@ with st.sidebar:
     
     # Logout button
     if st.button("🚪 Logout", use_container_width=True, type="primary"):
-        # Clear all session state
         st.session_state.username = None
         st.session_state.full_name = None
         st.rerun()
     
     st.markdown("---")
     st.caption("💰 Your personal finance data")
+    st.caption("🔒 Private & Secure")
 
-# Run selected page
+# Run page
 pg.run()
