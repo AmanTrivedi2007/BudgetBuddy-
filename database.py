@@ -47,7 +47,6 @@ def init_database():
                 cursor.execute("PRAGMA table_info(income)")
                 income_columns = [col[1] for col in cursor.fetchall()]
                 conn.close()
-                
                 if 'user_id' not in income_columns:
                     os.remove(DB_FILE)
                     print("✅ Old database format - recreating")
@@ -176,7 +175,6 @@ def init_database():
     conn.close()
     print("✅ Database initialized successfully")
 
-
 # ===== INCOME FUNCTIONS =====
 
 def add_income_to_db(user_id, source, amount, date, notes=""):
@@ -217,7 +215,6 @@ def delete_income_from_db(user_id, income_id):
     conn.commit()
     conn.close()
 
-
 # ===== EXPENSE FUNCTIONS =====
 
 def add_expense_to_db(user_id, category, amount, date, description=""):
@@ -257,7 +254,6 @@ def delete_expense_from_db(user_id, expense_id):
     cursor.execute('DELETE FROM expenses WHERE id = ? AND user_id = ?', (expense_id, user_id))
     conn.commit()
     conn.close()
-
 
 # ===== GOAL FUNCTIONS =====
 
@@ -361,7 +357,6 @@ def delete_goal_from_db(user_id, goal_name):
     conn.commit()
     conn.close()
 
-
 # ===== LOGIN ATTEMPTS FUNCTIONS =====
 
 def get_login_attempts(username):
@@ -399,17 +394,15 @@ def reset_login_attempts(username):
     conn.commit()
     conn.close()
 
-
 # ===== BUDGET MANAGEMENT FUNCTIONS (NEW) =====
 
 def get_all_budgets(user_id):
     """Get all budgets for specific user"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     cursor.execute('''
         SELECT category, limit_amount, alert_50, alert_75, alert_90, notes
-        FROM budgets 
+        FROM budgets
         WHERE user_id = ?
     ''', (user_id,))
     rows = cursor.fetchall()
@@ -431,7 +424,6 @@ def add_budget_to_db(user_id, category, limit_amount, alert_50=True, alert_75=Tr
     """Add new budget to database"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     try:
         cursor.execute('''
             INSERT INTO budgets (user_id, category, limit_amount, alert_50, alert_75, alert_90, notes)
@@ -448,49 +440,39 @@ def update_budget(user_id, category, limit_amount, alert_50=True, alert_75=True,
     """Update existing budget"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     cursor.execute('''
-        UPDATE budgets 
+        UPDATE budgets
         SET limit_amount = ?, alert_50 = ?, alert_75 = ?, alert_90 = ?, notes = ?
         WHERE user_id = ? AND category = ?
     ''', (limit_amount, alert_50, alert_75, alert_90, notes, user_id, category))
-    
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
-    
     return rows_affected > 0
 
 def delete_budget(user_id, category):
     """Delete budget from database"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     cursor.execute('DELETE FROM budgets WHERE user_id = ? AND category = ?', (user_id, category))
-    
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
-    
     return rows_affected > 0
 
 def get_category_spending(user_id, category, month):
     """Get total spending for a specific category in a specific month"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     # month format should be 'YYYY-MM'
     cursor.execute('''
-        SELECT SUM(amount) 
-        FROM expenses 
+        SELECT SUM(amount)
+        FROM expenses
         WHERE user_id = ? AND category = ? AND strftime('%Y-%m', date) = ?
     ''', (user_id, category, month))
-    
     result = cursor.fetchone()
     conn.close()
-    
     return result[0] if result[0] is not None else 0.0
-
 
 # ===== RECURRING TRANSACTIONS FUNCTIONS (NEW) =====
 
@@ -498,10 +480,9 @@ def get_all_recurring_transactions(user_id):
     """Get all recurring transactions for user"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     cursor.execute('''
         SELECT id, type, category, amount, frequency, start_date, next_date, description
-        FROM recurring_transactions 
+        FROM recurring_transactions
         WHERE user_id = ?
         ORDER BY next_date
     ''', (user_id,))
@@ -526,10 +507,9 @@ def add_recurring_transaction(user_id, trans_type, category, amount, frequency, 
     """Add new recurring transaction"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     try:
         cursor.execute('''
-            INSERT INTO recurring_transactions 
+            INSERT INTO recurring_transactions
             (user_id, type, category, amount, frequency, start_date, next_date, description)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (user_id, trans_type, category, amount, frequency, start_date, start_date, description))
@@ -545,24 +525,19 @@ def delete_recurring_transaction(transaction_id):
     """Delete recurring transaction"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     cursor.execute('DELETE FROM recurring_transactions WHERE id = ?', (transaction_id,))
-    
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
-    
     return rows_affected > 0
 
 def get_recurring_transaction_by_id(transaction_id):
     """Get single recurring transaction by ID"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
     cursor.execute('SELECT * FROM recurring_transactions WHERE id = ?', (transaction_id,))
     row = cursor.fetchone()
     conn.close()
-    
     return row
 
 def process_recurring_transactions(user_id):
@@ -571,11 +546,12 @@ def process_recurring_transactions(user_id):
     cursor = conn.cursor()
     
     today = datetime.now().date()
+    processed_count = 0  # ← ADDED: Track how many processed
     
     # Get all recurring transactions that are due
     cursor.execute('''
         SELECT id, type, category, amount, frequency, next_date, description
-        FROM recurring_transactions 
+        FROM recurring_transactions
         WHERE user_id = ? AND date(next_date) <= date(?)
     ''', (user_id, str(today)))
     
@@ -585,7 +561,7 @@ def process_recurring_transactions(user_id):
         trans_id, trans_type, category, amount, frequency, next_date, description = trans
         
         # Add to income or expense
-        if trans_type == 'income':
+        if trans_type == 'Income':  # ← FIXED: Capital 'I'
             cursor.execute('''
                 INSERT INTO income (user_id, source, amount, date, notes)
                 VALUES (?, ?, ?, ?, ?)
@@ -596,14 +572,16 @@ def process_recurring_transactions(user_id):
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, category, amount, str(today), f"[Recurring] {description}"))
         
+        processed_count += 1  # ← ADDED: Increment counter
+        
         # Calculate next date
         next_date_obj = datetime.strptime(next_date, '%Y-%m-%d').date()
         
-        if frequency == 'daily':
+        if frequency == 'Daily':  # ← FIXED: Capital 'D'
             new_next_date = next_date_obj + timedelta(days=1)
-        elif frequency == 'weekly':
+        elif frequency == 'Weekly':  # ← FIXED: Capital 'W'
             new_next_date = next_date_obj + timedelta(weeks=1)
-        elif frequency == 'monthly':
+        elif frequency == 'Monthly':  # ← FIXED: Capital 'M'
             # Add 1 month
             month = next_date_obj.month + 1
             year = next_date_obj.year
@@ -617,7 +595,7 @@ def process_recurring_transactions(user_id):
                 # Use last day of month
                 last_day = calendar.monthrange(year, month)[1]
                 new_next_date = next_date_obj.replace(year=year, month=month, day=last_day)
-        elif frequency == 'yearly':
+        elif frequency == 'Yearly':  # ← FIXED: Capital 'Y'
             new_next_date = next_date_obj.replace(year=next_date_obj.year + 1)
         else:
             new_next_date = next_date_obj
@@ -625,9 +603,14 @@ def process_recurring_transactions(user_id):
         # Update next_date
         cursor.execute('''
             UPDATE recurring_transactions 
-            SET next_date = ?
+            SET next_date = ? 
             WHERE id = ?
         ''', (str(new_next_date), trans_id))
     
     conn.commit()
     conn.close()
+    
+    return processed_count  # ← ADDED: Return the count!
+
+# Initialize database when module is imported
+init_database()
