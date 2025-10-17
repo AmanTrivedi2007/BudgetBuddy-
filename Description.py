@@ -1,107 +1,446 @@
-# about.py
+# Description.py
+
 import streamlit as st
 
-# Page configuration
-st.set_page_config(page_title="About - Finance Tracker", page_icon="💰", layout="wide")
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 40px;
+        border-radius: 15px;
+        text-align: center;
+        color: white;
+        margin-bottom: 30px;
+        animation: fadeIn 1s ease-in;
+    }
+    
+    .feature-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin: 10px 0;
+        border-left: 4px solid #667eea;
+        transition: transform 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .version-badge {
+        display: inline-block;
+        background: #2ecc71;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    
+    .new-feature {
+        background: #ff6b6b;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.7em;
+        margin-left: 8px;
+        font-weight: bold;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Header section
-st.title("💰 Personal Finance Tracker")
-st.markdown("### Your All-in-One Financial Management Solution")
+# Header with animation
+st.markdown('''
+<div class="main-header">
+    <h1 style="font-size: 3.5em; margin: 0;">💰 BudgetBuddy</h1>
+    <p style="font-size: 1.4em; margin: 10px 0;">Your Advanced Personal Finance Companion</p>
+    <span class="version-badge">Version 3.0 - 2025 Edition</span>
+</div>
+''', unsafe_allow_html=True)
+
+# Quick Stats Overview
+st.markdown("## 📊 At a Glance")
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric("Features", "8+", delta="Complete Suite", help="Comprehensive financial management tools")
+with col2:
+    st.metric("Charts", "20+", delta="Interactive", help="Advanced Plotly visualizations with hover & zoom")
+with col3:
+    st.metric("Security", "100%", delta="Encrypted", help="Your data is protected with industry-standard encryption")
+with col4:
+    st.metric("Export Options", "Multiple", delta="CSV/Excel", help="Download your data anytime")
+
 st.markdown("---")
 
 # Introduction
+st.markdown("## 🎯 Welcome to BudgetBuddy!")
+
 st.write("""
-Welcome to your Personal Finance Tracker! This comprehensive application helps you take control 
-of your finances with powerful tools for tracking, analyzing, and planning your financial future.
+**BudgetBuddy** is your all-in-one financial intelligence platform designed to help you take complete control 
+of your finances. With cutting-edge visualizations, smart insights, and powerful tracking tools, managing 
+your money has never been easier or more insightful!
 """)
 
-st.markdown("---")
-
-# Features section with columns
-st.header("✨ Key Features")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("📊 Expense Tracking")
-    st.write("""
-    - Record daily expenses with categories
-    - Track spending patterns over time
-    - Add notes and descriptions to transactions
-    - Categorize expenses for better insights
-    """)
-    
-    st.subheader("💵 Income Monitoring")
-    st.write("""
-    - Log multiple income sources
-    - Track salary, freelance, and passive income
-    - Monitor income trends monthly/yearly
-    - Calculate total earnings automatically
-    """)
-    
-    st.subheader("🎯 Saving Goals")
-    st.write("""
-    - Set and track multiple saving goals
-    - Visual progress indicators
-    - Calculate time to reach goals
-    - Get motivational insights
-    """)
-
-with col2:
-    st.subheader("📈 Spending Visualization")
-    st.write("""
-    - Interactive charts and graphs
-    - Category-wise spending breakdown
-    - Monthly comparison reports
-    - Identify spending trends
-    """)
-    
-    st.subheader("💼 Budgeting Tools")
-    st.write("""
-    - Create custom budgets by category
-    - Track budget vs actual spending
-    - Get alerts for overspending
-    - Smart budget recommendations
-    """)
-    
-    st.subheader("📱 User-Friendly Interface")
-    st.write("""
-    - Clean and intuitive design
-    - Easy navigation between features
-    - Real-time data updates
-    - Responsive layout for all devices
-    """)
+st.info("💡 **New in Version 3.0:** Advanced interactive dashboards with 20+ chart types, AI-powered insights, and real-time financial health scoring!")
 
 st.markdown("---")
 
-# How it works section
-st.header("🚀 How It Works")
+# Core Features - Updated with new capabilities
+st.markdown("## ✨ Comprehensive Feature Suite")
 
-col1, col2, col3 = st.columns(3)
+# Feature tabs for better organization
+tab1, tab2, tab3, tab4 = st.tabs(["💰 Tracking & Monitoring", "📊 Analytics & Insights", "🎯 Planning & Goals", "🔒 Security & Export"])
+
+with tab1:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown('''
+        <div class="feature-card">
+            <h3>📊 Advanced Expense Tracking</h3>
+            <ul>
+                <li>✅ Record expenses with detailed categorization</li>
+                <li>✅ Add custom descriptions and notes</li>
+                <li>✅ Track spending patterns over time</li>
+                <li>✅ Multiple category support (10+ categories)</li>
+                <li>✅ Real-time expense calculations</li>
+                <li>✅ Date-based filtering and search</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h3>🔄 Recurring Transactions <span class="new-feature">NEW</span></h3>
+            <ul>
+                <li>✅ Set up automated recurring expenses</li>
+                <li>✅ Daily, weekly, monthly, yearly frequencies</li>
+                <li>✅ Never miss regular payments</li>
+                <li>✅ Edit or pause recurring transactions</li>
+                <li>✅ Automatic transaction generation</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('''
+        <div class="feature-card">
+            <h3>💵 Income Monitoring</h3>
+            <ul>
+                <li>✅ Track multiple income sources</li>
+                <li>✅ Salary, freelance, passive income tracking</li>
+                <li>✅ Monthly/yearly income trends</li>
+                <li>✅ Income diversity analysis</li>
+                <li>✅ Automatic total calculations</li>
+                <li>✅ Income vs expense comparisons</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h3>📱 Smart Categories</h3>
+            <ul>
+                <li>✅ Pre-built expense categories</li>
+                <li>✅ Customizable category system</li>
+                <li>✅ Icon-based visual identification</li>
+                <li>✅ Category-wise budget allocation</li>
+                <li>✅ Intelligent category suggestions</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+
+with tab2:
+    st.markdown("### 📈 Advanced Interactive Visualizations <span class='new-feature'>UPGRADED</span>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown('''
+        <div class="feature-card">
+            <h4>🍩 Interactive Charts</h4>
+            <ul>
+                <li>🎨 <b>Donut Charts</b> - Expense distribution with hover details</li>
+                <li>🗺️ <b>Treemaps</b> - Hierarchical spending visualization</li>
+                <li>💧 <b>Waterfall Charts</b> - Cash flow breakdown</li>
+                <li>🌊 <b>Sankey Diagrams</b> - Money flow visualization</li>
+                <li>📦 <b>Box Plots</b> - Expense distribution & outliers</li>
+                <li>🔥 <b>Heatmaps</b> - Monthly category spending patterns</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h4>📊 Time Series Analysis</h4>
+            <ul>
+                <li>📅 Daily spending trends with moving averages</li>
+                <li>📈 7-day and 30-day trend analysis</li>
+                <li>📆 Weekly spending patterns</li>
+                <li>📊 Monthly comparison charts</li>
+                <li>🔍 Interactive date range filtering</li>
+                <li>📉 Spending velocity metrics</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('''
+        <div class="feature-card">
+            <h4>🎯 Smart Insights <span class="new-feature">NEW</span></h4>
+            <ul>
+                <li>💯 <b>Financial Health Score</b> - Comprehensive rating (0-100)</li>
+                <li>📊 Category-wise spending breakdown</li>
+                <li>🔝 Top 10 highest expenses tracker</li>
+                <li>⚡ Transaction frequency analysis</li>
+                <li>⚠️ Spending alerts for over-budget categories</li>
+                <li>💡 Personalized recommendations</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h4>📉 Comparative Analysis</h4>
+            <ul>
+                <li>📈 Month-over-month growth charts</li>
+                <li>📊 Income vs expense comparisons</li>
+                <li>💰 Savings rate tracking</li>
+                <li>📅 Day-of-week spending patterns</li>
+                <li>🎯 Category performance metrics</li>
+                <li>📍 Trend line predictions</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+
+with tab3:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown('''
+        <div class="feature-card">
+            <h3>🎯 Savings Goals Tracker</h3>
+            <ul>
+                <li>✅ Set multiple savings goals</li>
+                <li>✅ Visual progress bars (0-100%)</li>
+                <li>✅ Track saved vs target amounts</li>
+                <li>✅ Goal completion forecasts</li>
+                <li>✅ Interactive stacked progress charts</li>
+                <li>✅ Motivational achievement status</li>
+                <li>✅ Time-to-goal calculations</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h3>💡 Smart Recommendations <span class="new-feature">NEW</span></h3>
+            <ul>
+                <li>✅ AI-powered financial advice</li>
+                <li>✅ Expense control suggestions</li>
+                <li>✅ Savings rate optimization tips</li>
+                <li>✅ Income diversification guidance</li>
+                <li>✅ Goal achievement strategies</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('''
+        <div class="feature-card">
+            <h3>💼 Budget Management</h3>
+            <ul>
+                <li>✅ Create custom category budgets</li>
+                <li>✅ Track budget vs actual spending</li>
+                <li>✅ Real-time overspending alerts</li>
+                <li>✅ Budget utilization percentages</li>
+                <li>✅ Smart budget recommendations</li>
+                <li>✅ Remaining budget calculations</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h3>📊 Financial Health Dashboard <span class="new-feature">NEW</span></h3>
+            <ul>
+                <li>✅ Comprehensive health score (0-100)</li>
+                <li>✅ Interactive gauge visualization</li>
+                <li>✅ Score breakdown by category</li>
+                <li>✅ Expense control rating (35 points)</li>
+                <li>✅ Savings rate evaluation (30 points)</li>
+                <li>✅ Goal planning assessment (20 points)</li>
+                <li>✅ Income diversity score (15 points)</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+
+with tab4:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown('''
+        <div class="feature-card">
+            <h3>🔒 Security & Privacy</h3>
+            <ul>
+                <li>🔐 Secure user authentication</li>
+                <li>🔒 Password hashing with SHA-256</li>
+                <li>👤 Multi-user support</li>
+                <li>💾 SQLite database encryption</li>
+                <li>🛡️ Session-based access control</li>
+                <li>📱 Secure data transmission</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h3>🔍 Advanced Filtering <span class="new-feature">NEW</span></h3>
+            <ul>
+                <li>📅 Date range filtering (custom, 7/30/90 days)</li>
+                <li>🏷️ Category-based filtering</li>
+                <li>🔎 Multi-criteria search</li>
+                <li>📊 Real-time chart updates</li>
+                <li>💾 Save filter preferences</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('''
+        <div class="feature-card">
+            <h3>📥 Data Export Options</h3>
+            <ul>
+                <li>📊 Export to CSV format</li>
+                <li>📈 Export to Excel</li>
+                <li>💾 Download expense reports</li>
+                <li>💰 Download income records</li>
+                <li>🎯 Download goals data</li>
+                <li>📅 Timestamped file names</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown('''
+        <div class="feature-card">
+            <h3>📱 User Experience</h3>
+            <ul>
+                <li>🎨 Modern, intuitive interface</li>
+                <li>⚡ Real-time data updates</li>
+                <li>📱 Responsive design</li>
+                <li>🖱️ Interactive hover tooltips</li>
+                <li>🔍 Zoom & pan on charts</li>
+                <li>💫 Smooth animations</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+
+st.markdown("---")
+
+# How It Works
+st.markdown("## 🚀 How BudgetBuddy Works")
+
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.markdown("#### 1️⃣ Track")
-    st.info("Record your income and expenses as they happen. Categorize transactions for better organization.")
+    st.markdown("""
+    <div style='text-align: center; padding: 20px; background: #f0f2f6; border-radius: 10px;'>
+        <h2>1️⃣</h2>
+        <h4>Track</h4>
+        <p>Record income and expenses with detailed categories and descriptions</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 with col2:
-    st.markdown("#### 2️⃣ Analyze")
-    st.info("View detailed visualizations and reports to understand your spending patterns and habits.")
+    st.markdown("""
+    <div style='text-align: center; padding: 20px; background: #f0f2f6; border-radius: 10px;'>
+        <h2>2️⃣</h2>
+        <h4>Visualize</h4>
+        <p>Explore 20+ interactive charts with real-time insights</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 with col3:
-    st.markdown("#### 3️⃣ Plan")
-    st.info("Set budgets and savings goals. Get insights to make smarter financial decisions.")
+    st.markdown("""
+    <div style='text-align: center; padding: 20px; background: #f0f2f6; border-radius: 10px;'>
+        <h2>3️⃣</h2>
+        <h4>Analyze</h4>
+        <p>Get financial health scores and personalized recommendations</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col4:
+    st.markdown("""
+    <div style='text-align: center; padding: 20px; background: #f0f2f6; border-radius: 10px;'>
+        <h2>4️⃣</h2>
+        <h4>Achieve</h4>
+        <p>Set goals, create budgets, and reach financial freedom</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# Benefits section
-st.header("🌟 Benefits")
+# Technology Stack
+st.markdown("## 🔧 Built With Modern Technology")
+
+tech_col1, tech_col2, tech_col3, tech_col4 = st.columns(4)
+
+with tech_col1:
+    st.markdown("""
+    **Frontend Framework**
+    - 🎨 Streamlit 1.28+
+    - 🐍 Python 3.8+
+    - 💅 Custom CSS
+    """)
+
+with tech_col2:
+    st.markdown("""
+    **Data Processing**
+    - 📊 Pandas
+    - 🔢 NumPy
+    - 🤖 Scikit-learn
+    """)
+
+with tech_col3:
+    st.markdown("""
+    **Visualizations**
+    - 📈 Plotly Express
+    - 📊 Plotly Graph Objects
+    - 🎨 Matplotlib
+    - 🌊 Seaborn
+    """)
+
+with tech_col4:
+    st.markdown("""
+    **Database & Security**
+    - 💾 SQLite3
+    - 🔒 Hashlib (SHA-256)
+    - 🛡️ Session Management
+    """)
+
+st.markdown("---")
+
+# Benefits Section
+st.markdown("## 🌟 Why Choose BudgetBuddy?")
 
 benefits = {
-    "Financial Awareness": "Understand exactly where your money goes each month",
-    "Better Decisions": "Make informed financial choices based on real data",
-    "Goal Achievement": "Stay motivated and on track to reach your savings targets",
-    "Stress Reduction": "Feel confident about your financial situation",
-    "Time Saving": "Automated calculations and reports save you hours"
+    "💡 Complete Financial Visibility": "Understand exactly where every rupee goes with detailed tracking and 20+ interactive visualizations",
+    "🎯 Data-Driven Decisions": "Make informed financial choices based on real-time insights, trends, and AI-powered recommendations",
+    "🏆 Goal Achievement": "Stay motivated with visual progress tracking and get personalized strategies to reach your financial targets",
+    "⚡ Time-Saving Automation": "Recurring transactions, automatic calculations, and smart categorization save hours every month",
+    "📊 Advanced Analytics": "Moving averages, trend predictions, month-over-month comparisons, and statistical analysis at your fingertips",
+    "🔒 Bank-Level Security": "Your sensitive financial data is protected with encryption and secure authentication",
+    "📱 User-Friendly Experience": "Intuitive interface with hover tooltips, interactive charts, and smooth navigation",
+    "💾 Full Data Control": "Export your data anytime in CSV/Excel format - you own your financial information"
 }
 
 for benefit, description in benefits.items():
@@ -110,452 +449,141 @@ for benefit, description in benefits.items():
 
 st.markdown("---")
 
-# Technology section
-st.header("🔧 Built With")
+# What's New Section
+st.markdown("## 🆕 What's New in Version 3.0")
 
-tech_col1, tech_col2, tech_col3 = st.columns(3)
+st.success("""
+**Major Updates & Features:**
 
-with tech_col1:
-    st.markdown("**Frontend**")
-    st.write("- Streamlit")
-    st.write("- Python")
+✨ **Advanced Interactive Dashboard** - 20+ new chart types including donut charts, treemaps, waterfall charts, Sankey diagrams, heatmaps, and box plots
 
-with tech_col2:
-    st.markdown("**Data Processing**")
-    st.write("- Pandas")
-    st.write("- NumPy")
+💯 **Financial Health Score** - Comprehensive 100-point scoring system with AI-powered recommendations
 
-with tech_col3:
-    st.markdown("**Visualization**")
-    st.write("- Plotly")
-    st.write("- Matplotlib")
+📊 **Time Series Analysis** - Daily, weekly, and monthly trends with 7-day and 30-day moving averages
 
-st.markdown("---")
+🔍 **Advanced Filtering** - Date range and category-based filtering with real-time chart updates
 
-# Getting started section
-st.header("🎯 Getting Started")
+📈 **Comparative Analytics** - Month-over-month growth, income vs expense comparisons, and trend predictions
 
-st.write("""
-1. **Navigate** to Income Monitoring to add your income sources
-2. **Record** your daily expenses in Expense Tracking
-3. **Set** your savings goals in the Saving Goals section
-4. **Create** budgets using the Budgeting Tools
-5. **Analyze** your financial health with Spending Visualization
+🎯 **Goal Forecasting** - Estimated time to complete each savings goal based on current savings rate
+
+📉 **Spending Insights** - Top expenses, category breakdowns, transaction frequency, and spending velocity
+
+🗓️ **Calendar Analysis** - Day-of-week spending patterns and monthly category heatmaps
+
+💡 **Smart Recommendations** - Personalized financial advice based on your spending habits and health score
+
+📥 **Enhanced Export** - Download all financial data with timestamped CSV files
 """)
 
 st.markdown("---")
 
-# Footer
-st.success("💡 **Pro Tip:** Use this app daily for the best results! Consistent tracking leads to better financial insights.")
+# Getting Started Guide
+st.markdown("## 🎯 Quick Start Guide")
 
-st.info("📧 For questions or feedback, feel free to reach out!")
+st.markdown("""
+### 📝 **Step-by-Step Setup:**
 
-# Statistics (optional - can be made dynamic)
+1. **🔐 Create Account** → Register with a unique username and secure password
+2. **💵 Add Income** → Navigate to Income Monitoring and log your income sources
+3. **📊 Record Expenses** → Use Expense Tracking to add your daily expenses
+4. **🔄 Set Recurring** → Configure recurring transactions for regular bills
+5. **💼 Create Budget** → Set category budgets in Budget Management
+6. **🎯 Define Goals** → Add savings goals in the Saving Goals section
+7. **📈 Visualize** → Explore the Advanced Visualization Dashboard
+8. **💯 Check Score** → Monitor your Financial Health Score
+9. **📥 Export Data** → Download reports for external analysis
+
+### 💡 **Pro Tips:**
+- ✅ Track expenses daily for accurate insights
+- ✅ Use filters to analyze specific time periods
+- ✅ Hover over charts for detailed information
+- ✅ Set realistic budgets based on historical data
+- ✅ Review your financial health score weekly
+- ✅ Export data monthly for backup
+""")
+
 st.markdown("---")
-st.header("📊 App Statistics")
 
-stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+# Interactive Features Highlight
+st.markdown("## 🖱️ Interactive Features Guide")
+
+feature_col1, feature_col2 = st.columns(2)
+
+with feature_col1:
+    st.info("""
+    **📊 Chart Interactions:**
+    - 🖱️ **Hover** - View detailed data tooltips
+    - 🔍 **Click & Drag** - Zoom into specific areas
+    - 👆 **Double-click** - Reset zoom to default view
+    - 🎨 **Click Legend** - Show/hide data series
+    - 📏 **Pan** - Move around zoomed charts
+    """)
+
+with feature_col2:
+    st.warning("""
+    **⚡ Dashboard Features:**
+    - 📅 **Date Filters** - Select custom time ranges
+    - 🏷️ **Category Filters** - Focus on specific expenses
+    - 🔄 **Real-time Updates** - Changes reflect instantly
+    - 💾 **Auto-save** - All data saved automatically
+    - 📱 **Responsive** - Works on all screen sizes
+    """)
+
+st.markdown("---")
+
+# Statistics Dashboard
+st.markdown("## 📊 App Capabilities at a Glance")
+
+stat_col1, stat_col2, stat_col3, stat_col4, stat_col5 = st.columns(5)
 
 with stat_col1:
-    st.metric("Features", "5", delta="Complete")
-    
+    st.metric("Total Features", "8", delta="Core Modules", help="Complete financial management suite")
 with stat_col2:
-    st.metric("Categories", "10+", delta="Customizable")
-    
+    st.metric("Chart Types", "20+", delta="Interactive", help="Plotly-powered visualizations")
 with stat_col3:
-    st.metric("Charts", "Multiple", delta="Interactive")
-    
+    st.metric("Categories", "10+", delta="Customizable", help="Flexible expense categories")
 with stat_col4:
-    st.metric("Export", "CSV/Excel", delta="Available")
-# Description.py
-import streamlit as st
+    st.metric("Export Formats", "2", delta="CSV & Excel", help="Multiple export options")
+with stat_col5:
+    st.metric("Security Level", "High", delta="Encrypted", help="Bank-grade protection")
 
-# Custom CSS for better styling
+st.markdown("---")
+
+# Call to Action
 st.markdown("""
-    <style>
-    .big-font {
-        font-size: 60px !important;
-        font-weight: bold;
-        text-align: center;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 20px;
-    }
-    .subtitle {
-        text-align: center;
-        font-size: 24px;
-        color: #666;
-        margin-bottom: 40px;
-    }
-    .feature-box {
-        background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 4px solid #667eea;
-        margin-bottom: 20px;
-    }
-    .version-badge {
-        display: inline-block;
-        padding: 5px 15px;
-        background: #667eea;
-        color: white;
-        border-radius: 20px;
-        font-size: 14px;
-        font-weight: bold;
-    }
-    </style>
+<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            padding: 40px; 
+            border-radius: 15px; 
+            text-align: center; 
+            color: white;
+            margin: 30px 0;'>
+    <h2 style='margin: 0; font-size: 2.5em;'>🚀 Start Your Financial Journey Today!</h2>
+    <p style='font-size: 1.3em; margin: 20px 0;'>
+        Take control of your finances with BudgetBuddy's powerful analytics and smart insights
+    </p>
+    <p style='font-size: 1.1em; margin: 10px 0;'>
+        Track • Visualize • Analyze • Achieve
+    </p>
+</div>
 """, unsafe_allow_html=True)
 
-# Header with animation
-st.markdown('<p class="big-font">💰 BudgetBuddy</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Your Personal Finance Companion</p>', unsafe_allow_html=True)
-
-# Version badge
-col1, col2, col3 = st.columns([1, 1, 1])
-with col2:
-    st.markdown('<center><span class="version-badge">Version 2.0 - Secure Login Edition</span></center>', unsafe_allow_html=True)
-
+# Footer
 st.markdown("---")
 
-# Welcome message with emoji
-st.markdown("""
-## 🎉 Welcome to BudgetBuddy!
+footer_col1, footer_col2, footer_col3 = st.columns([1, 2, 1])
 
-Take complete control of your finances with our comprehensive financial management application. 
-Track income, manage expenses, achieve savings goals, and visualize your spending patterns—all in one secure, 
-user-friendly platform designed specifically for your success.
-""")
-
-st.markdown("---")
-
-# Key Features Section with enhanced design
-st.header("✨ Powerful Features")
-
-col1, col2 = st.columns(2)
-
-with col1:
+with footer_col2:
     st.markdown("""
-    <div class="feature-box">
-        <h3>💵 Income Monitoring</h3>
-        <p>Track all your income sources efficiently:</p>
-        <ul>
-            <li>📊 Log salary, freelance, and passive income</li>
-            <li>📈 Monitor income trends over time</li>
-            <li>💼 Multiple income source management</li>
-            <li>📥 Export income reports as CSV</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="feature-box">
-        <h3>🎯 Savings Goals</h3>
-        <p>Achieve your financial dreams:</p>
-        <ul>
-            <li>🎪 Create unlimited savings goals</li>
-            <li>📊 Visual progress tracking</li>
-            <li>💰 Automatic balance deduction</li>
-            <li>📝 Transaction history for each goal</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="feature-box">
-        <h3>🔒 Secure Authentication</h3>
-        <p>Your data is protected:</p>
-        <ul>
-            <li>🔐 SHA-256 password encryption</li>
-            <li>👤 Unique username generation</li>
-            <li>🛡️ Personal data isolation</li>
-            <li>🔑 Secure login system</li>
-        </ul>
+    <div style='text-align: center; padding: 20px;'>
+        <p style='font-size: 1.1em; color: #666;'>
+            Made with ❤️ using Streamlit | Version 3.0 | © 2025 BudgetBuddy
+        </p>
+        <p style='font-size: 0.9em; color: #999;'>
+            🔒 Your data is encrypted and secure | 📧 For support, contact us
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
-    st.markdown("""
-    <div class="feature-box">
-        <h3>💳 Expense Tracking</h3>
-        <p>Never lose track of spending:</p>
-        <ul>
-            <li>🏷️ 8+ expense categories</li>
-            <li>⚠️ Overspending prevention</li>
-            <li>📊 Real-time balance updates</li>
-            <li>🔍 Filter and sort transactions</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="feature-box">
-        <h3>📊 Visual Analytics</h3>
-        <p>Understand your finances at a glance:</p>
-        <ul>
-            <li>🍰 Pie charts for category breakdown</li>
-            <li>📈 Line charts for spending trends</li>
-            <li>🔥 Heatmaps for monthly analysis</li>
-            <li>💯 Financial health score</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="feature-box">
-        <h3>📱 User Experience</h3>
-        <p>Designed for simplicity:</p>
-        <ul>
-            <li>🎨 Clean, modern interface</li>
-            <li>⚡ Fast and responsive</li>
-            <li>📱 Works on all devices</li>
-            <li>🌐 No installation required</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("---")
-
-# How It Works - Interactive
-st.header("🚀 How It Works")
-
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["1️⃣ Sign Up", "2️⃣ Track Income", "3️⃣ Manage Expenses", "4️⃣ Set Goals", "5️⃣ Analyze Data"])
-
-with tab1:
-    st.markdown("""
-    ### 📝 Create Your Account
-    
-    **Getting started is easy:**
-    1. Click on **Sign Up** button
-    2. Enter your full name (e.g., "Rahul Kumar")
-    3. System generates unique username (e.g., "rahulk")
-    4. Set a secure password (minimum 6 characters)
-    5. Remember your username for future logins
-    
-    ✅ **Pro Tip:** Write down your username immediately after signup!
-    """)
-    st.success("✨ Your data is encrypted and secure from day one!")
-
-with tab2:
-    st.markdown("""
-    ### 💵 Monitor Your Income
-    
-    **Add all income sources:**
-    1. Navigate to **Income Monitoring** page
-    2. Click **Add New Income** button
-    3. Select source (Salary, Freelance, Business, etc.)
-    4. Enter amount and date
-    5. Add optional notes
-    
-    📊 **Features:**
-    - View total income instantly
-    - Download income reports
-    - Track income trends
-    - Manage multiple sources
-    """)
-    st.info("💡 Regular tracking helps you understand your earning patterns!")
-
-with tab3:
-    st.markdown("""
-    ### 💳 Track Your Expenses
-    
-    **Stay on top of spending:**
-    1. Go to **Expense Tracking** page
-    2. Add expense with category
-    3. System checks available balance
-    4. Prevents overspending automatically
-    5. View spending by category
-    
-    🔍 **Smart Features:**
-    - Balance validation before spending
-    - Category-wise breakdown
-    - Filter and sort options
-    - Monthly spending reports
-    """)
-    st.warning("⚠️ App prevents you from spending more than you have!")
-
-with tab4:
-    st.markdown("""
-    ### 🎯 Achieve Your Goals
-    
-    **Make dreams reality:**
-    1. Visit **Saving Goals** page
-    2. Create goal (e.g., "New Laptop - ₹60,000")
-    3. Add money from available balance
-    4. Track progress with visual bars
-    5. Withdraw if needed
-    
-    🎪 **Goal Management:**
-    - Multiple goals support
-    - Progress tracking
-    - Transaction history
-    - Goal completion alerts
-    """)
-    st.success("🎉 Stay motivated watching your progress!")
-
-with tab5:
-    st.markdown("""
-    ### 📊 Visualize Your Finances
-    
-    **Make data-driven decisions:**
-    1. Check **Spending Visualization** page
-    2. View pie charts, bar graphs
-    3. Analyze spending trends
-    4. Monitor financial health score
-    5. Export data as CSV
-    
-    📈 **Analytics Include:**
-    - Category distribution
-    - Monthly comparisons
-    - Income vs expense trends
-    - Financial health rating (0-100)
-    """)
-    st.info("📊 Data visualization helps spot patterns and save money!")
-
-st.markdown("---")
-
-# Benefits Section with metrics
-st.header("🌟 Why Choose BudgetBuddy?")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("⚡ Speed", "Instant", delta="Real-time updates")
-with col2:
-    st.metric("🔒 Security", "SHA-256", delta="Bank-level encryption")
-with col3:
-    st.metric("📱 Access", "Anywhere", delta="Cloud-based")
-with col4:
-    st.metric("💰 Cost", "Free", delta="Always free")
-
-st.markdown("---")
-
-# Benefits expandable
-benefits = {
-    "💡 Financial Awareness": "Understand exactly where your money goes each month with detailed breakdowns and insights.",
-    "🎯 Goal Achievement": "Stay motivated and on track to reach your savings targets with visual progress tracking.",
-    "⚠️ Overspending Prevention": "Never spend more than you have. App validates balance before every transaction.",
-    "📊 Data-Driven Decisions": "Make informed financial choices based on real data, not guesswork.",
-    "⏱️ Time Saving": "Automated calculations save hours of manual tracking and Excel sheets.",
-    "🔒 Privacy Protection": "Each user has isolated data. Your finances stay private and secure.",
-    "📈 Trend Analysis": "Identify spending patterns and adjust habits for better financial health.",
-    "🎉 Motivation Boost": "Celebrate goal completions and track financial progress visually."
-}
-
-st.subheader("✅ Key Benefits")
-cols = st.columns(2)
-for idx, (benefit, description) in enumerate(benefits.items()):
-    with cols[idx % 2]:
-        with st.expander(benefit):
-            st.write(description)
-
-st.markdown("---")
-
-# Tech Stack
-st.header("🛠️ Technology Stack")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.markdown("**🎨 Frontend**")
-    st.write("• Streamlit")
-    st.write("• Python 3.13")
-    st.write("• Custom CSS")
-
-with col2:
-    st.markdown("**📊 Visualization**")
-    st.write("• Matplotlib")
-    st.write("• Seaborn")
-    st.write("• Pandas")
-
-with col3:
-    st.markdown("**💾 Database**")
-    st.write("• SQLite")
-    st.write("• SQL")
-    st.write("• Relational DB")
-
-with col4:
-    st.markdown("**🔐 Security**")
-    st.write("• SHA-256")
-    st.write("• Salt Hashing")
-    st.write("• Encryption")
-
-st.markdown("---")
-
-# Pro Tips Section
-st.header("💡 Pro Tips for Success")
-
-tip_col1, tip_col2 = st.columns(2)
-
-with tip_col1:
-    st.success("""
-    **📝 Daily Habits:**
-    - Track expenses as they happen
-    - Review spending every evening
-    - Update goals weekly
-    - Set alerts for overspending
-    """)
-
-with tip_col2:
-    st.info("""
-    **🎯 Best Practices:**
-    - Keep emergency fund (3-6 months)
-    - Don't spend >70% of income
-    - Save 20% minimum monthly
-    - Invest remaining wisely
-    """)
-
-st.markdown("---")
-
-# Statistics
-st.header("📊 App Features Overview")
-
-feat_col1, feat_col2, feat_col3, feat_col4 = st.columns(4)
-
-with feat_col1:
-    st.metric("Core Pages", "5", help="Income, Expense, Goals, Visualization, About")
-with feat_col2:
-    st.metric("Expense Categories", "8+", help="Food, Transport, Bills, Entertainment, etc.")
-with feat_col3:
-    st.metric("Chart Types", "7+", help="Pie, Bar, Line, Heatmap, Progress, etc.")
-with feat_col4:
-    st.metric("Export Formats", "CSV", help="Download all data as CSV files")
-
-st.markdown("---")
-
-# Version History
-with st.expander("📜 Version History"):
-    st.markdown("""
-    **Version 2.0 (Current)** - October 2025
-    - ✅ Added secure login with SHA-256 encryption
-    - ✅ Unique username generation system
-    - ✅ Multi-user support with data isolation
-    - ✅ Enhanced UI/UX design
-    
-    **Version 1.0** - October 2025
-    - ✅ Basic income tracking
-    - ✅ Expense management
-    - ✅ Savings goals
-    - ✅ Data visualization
-    - ✅ Balance validation
-    """)
-
-st.markdown("---")
-
-# Footer with style
-st.markdown("""
-    <div style='text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); border-radius: 10px;'>
-        <h3>🎉 Ready to Take Control of Your Finances?</h3>
-        <p style='font-size: 18px;'>Start tracking today and achieve your financial goals!</p>
-        <br>
-        <p style='color: #666;'>Made with ❤️ using Streamlit | Version 2.0 | © 2025 BudgetBuddy</p>
-        <p style='color: #666; font-size: 12px;'>🔒 Your data is encrypted and secure</p>
-    </div>
-""", unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Final call to action
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.success("💡 **Pro Tip:** Use BudgetBuddy daily for 30 days to see real financial improvements!")
+# Final Tips
+st.success("💡 **Remember:** Consistent tracking is the key to financial success. Use BudgetBuddy daily for best results!")
