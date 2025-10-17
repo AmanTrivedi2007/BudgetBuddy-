@@ -1,15 +1,16 @@
 # App.py - Main Application with Onboarding Tutorial
 
 import streamlit as st
+import time
 from database import init_database
 from auth import check_authentication
 
-# Initialize database
+# Initialize database FIRST
 init_database()
 
 # Page configuration
 st.set_page_config(
-    page_title="BudgetBuddy",
+    page_title="BudgetBuddy - Smart Finance Manager",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -18,22 +19,25 @@ st.set_page_config(
 # Check authentication FIRST
 username = check_authentication()
 
-# Initialize dark mode in session state
+# If not authenticated, stop here (auth.py handles login UI)
+if not username or 'username' not in st.session_state:
+    st.stop()
+
+# Initialize session state variables
 if 'dark_mode' not in st.session_state:
     st.session_state.dark_mode = False
 
 # ===========================
-# SHOW ONBOARDING TUTORIAL FOR NEW USERS
+# SHOW ONBOARDING TUTORIAL (ONLY ONCE PER USER)
 # ===========================
 from boarding import show_onboarding_tutorial
 
-# Check if tutorial should be shown
+# Show tutorial if not completed
 if show_onboarding_tutorial():
-    # Tutorial is active - stop here and don't show the rest of the app
-    st.stop()
+    st.stop()  # Stop here - show only tutorial, nothing else
 
 # ===========================
-# MAIN APP (Shows only after tutorial is completed/skipped)
+# MAIN APP - Shows only after tutorial completion
 # ===========================
 
 # Define all pages
@@ -45,24 +49,53 @@ page5 = st.Page("recurring_transactions.py", title="Recurring Transactions", ico
 page6 = st.Page("Saving_goal.py", title="Savings Goals", icon="🎯")
 page7 = st.Page("visualization.py", title="Advanced Visualizations", icon="📊")
 
-# Create navigation with all pages
+# Create navigation
 pg = st.navigation(
     [page1, page2, page3, page4, page5, page6, page7],
     position="sidebar"
 )
 
 # ===========================
-# SIDEBAR - User Info & Settings
+# SIDEBAR - User Info, Settings & Controls
 # ===========================
 with st.sidebar:
     st.markdown("---")
     
-    # User info section
+    # User info section with profile card
     if st.session_state.get('full_name'):
-        st.markdown(f"### 👤 {st.session_state.full_name}")
-        st.caption(f"@{username}")
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; 
+                    border-radius: 10px; 
+                    text-align: center; 
+                    color: white;
+                    margin-bottom: 10px;'>
+            <h3 style='margin: 0;'>👤 {st.session_state.full_name}</h3>
+            <p style='margin: 5px 0 0 0; opacity: 0.9;'>@{username}</p>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown(f"### 👤 {username}")
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; 
+                    border-radius: 10px; 
+                    text-align: center; 
+                    color: white;
+                    margin-bottom: 10px;'>
+            <h3 style='margin: 0;'>👤 {username}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # LOGOUT BUTTON - Moved to top (prominent position)
+    if st.button("🚪 Logout", use_container_width=True, type="primary"):
+        # Clear all session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.success("✅ Logged out successfully!")
+        time.sleep(0.5)
+        st.rerun()
     
     st.markdown("---")
     
@@ -73,7 +106,7 @@ with st.sidebar:
     dark_mode = st.toggle(
         "🌙 Dark Mode",
         value=st.session_state.dark_mode,
-        help="Toggle dark/light theme"
+        help="Toggle between dark and light theme"
     )
     
     if dark_mode != st.session_state.dark_mode:
@@ -85,67 +118,100 @@ with st.sidebar:
         st.markdown("""
         <style>
             .stApp {
-                background-color: #1e1e1e;
-                color: #ffffff;
+                background-color: #0e1117;
+                color: #fafafa;
             }
             .stSidebar {
-                background-color: #2d2d2d;
+                background-color: #262730;
             }
-            .stMarkdown {
-                color: #ffffff;
+            .stMarkdown, .stText {
+                color: #fafafa;
+            }
+            div[data-testid="stMetricValue"] {
+                color: #fafafa;
+            }
+            .stButton button {
+                background-color: #1f2937;
+                color: #fafafa;
+            }
+            .stButton button:hover {
+                background-color: #374151;
             }
         </style>
         """, unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Tutorial Controls
+    # Tutorial & Help Section
     st.markdown("### 📚 Help & Tutorials")
     
-    # Show Tutorial Button
+    # Restart Tutorial Button
     if st.button("📖 Restart Tutorial", use_container_width=True):
-        # Reset onboarding to show again
         from boarding import reset_onboarding
         reset_onboarding()
         st.success("✅ Tutorial reset! Reloading...")
+        time.sleep(0.5)
         st.rerun()
     
-    st.markdown("---")
-    
-    # Quick Tips
-    with st.expander("💡 Quick Tips"):
+    # Quick Tips Expander
+    with st.expander("💡 Quick Tips", expanded=False):
         st.markdown("""
-        **Daily Tasks:**
-        - Log expenses immediately
-        - Check your dashboard
+        **Daily Habits:**
+        - 📝 Log expenses immediately
+        - 📊 Check dashboard every morning
+        - 🎯 Update savings progress
         
         **Weekly Reviews:**
-        - Review spending trends
-        - Update budget limits
+        - 📈 Review spending trends
+        - 💰 Check budget alerts
+        - 🔁 Verify recurring transactions
         
-        **Monthly Goals:**
-        - Export data for records
-        - Adjust savings goals
+        **Monthly Tasks:**
+        - 🔄 Adjust budget limits
+        - 📥 Export data for records
+        - 🎯 Set new savings goals
+        
+        **Pro Tips:**
+        - ✨ Use filters for detailed analysis
+        - ✨ Hover over charts for insights
+        - ✨ Set budget alerts at 75% & 90%
         """)
     
     st.markdown("---")
     
-    # Logout button
-    if st.button("🚪 Logout", use_container_width=True, type="primary"):
-        # Clear all session state
-        keys_to_clear = ['username', 'full_name', 'dark_mode', 'onboarding_completed', 'onboarding_step']
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
+    # App Info & Version
+    st.markdown("### ℹ️ App Info")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.caption("💰 **BudgetBuddy**")
+        st.caption("📊 **Version 3.0**")
+    with col2:
+        st.caption("🔒 **Secure**")
+        st.caption("🌐 **2025 Edition**")
     
     st.markdown("---")
     
-    # Footer info
-    st.caption("💰 BudgetBuddy v3.0")
-    st.caption("🔒 Your data is private & secure")
-    st.caption("📊 Real-time financial insights")
-    st.caption("🎯 Smart budget management")
+    # Feature badges
+    st.markdown("""
+    <div style='text-align: center; padding: 10px;'>
+        <span style='background: #2ecc71; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.75em; margin: 2px;'>✅ Real-time Analytics</span><br>
+        <span style='background: #3498db; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.75em; margin: 2px;'>📊 20+ Charts</span><br>
+        <span style='background: #e74c3c; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.75em; margin: 2px;'>🔐 Encrypted</span><br>
+        <span style='background: #f39c12; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.75em; margin: 2px;'>💡 AI Insights</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Footer with copyright
+    st.markdown("""
+    <div style='text-align: center; padding: 10px; color: #666; font-size: 0.85em;'>
+        <p style='margin: 2px;'>Made with ❤️ using Streamlit</p>
+        <p style='margin: 2px;'>© 2025 BudgetBuddy</p>
+        <p style='margin: 2px;'>Your financial companion</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Run the selected page
 pg.run()
