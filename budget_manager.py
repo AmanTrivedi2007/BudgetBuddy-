@@ -6,6 +6,9 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Import shared categories
+from categories import EXPENSE_CATEGORIES
+
 # Set matplotlib/seaborn style
 try:
     sns.set_style("whitegrid")
@@ -451,10 +454,11 @@ with st.form("add_budget_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
     
     with col1:
-        category = st.text_input(
-            "Category Name*",
-            placeholder="e.g., Food & Dining, Transportation",
-            help="Enter a descriptive name for this budget category"
+        # UPDATED: Using selectbox with shared categories instead of text_input
+        category = st.selectbox(
+            "Category*",
+            EXPENSE_CATEGORIES,
+            help="Choose category to set budget for"
         )
     
     with col2:
@@ -507,19 +511,16 @@ with st.form("add_budget_form", clear_on_submit=True):
     submit_budget = st.form_submit_button("💾 Create Budget", use_container_width=True, type="primary")
     
     if submit_budget:
-        if not category or category.strip() == "":
-            st.error("❌ Please enter a category name")
-        elif limit_amount <= 0:
+        if limit_amount <= 0:
             st.error("❌ Budget limit must be greater than 0")
         else:
-            category_clean = category.strip().title()
-            if add_budget_to_db(user_id, category_clean, limit_amount, alert_50, alert_75, alert_90, notes):
+            if add_budget_to_db(user_id, category, limit_amount, alert_50, alert_75, alert_90, notes):
                 st.success(f"✅ Budget created successfully!")
-                st.success(f"💰 **{category_clean}**: ₹{limit_amount:,.0f}/month")
+                st.success(f"💰 **{category}**: ₹{limit_amount:,.0f}/month")
                 st.balloons()
                 st.rerun()
             else:
-                st.error(f"❌ Budget for '{category_clean}' already exists!")
+                st.error(f"❌ Budget for '{category}' already exists!")
                 st.info("💡 Tip: Update the existing budget below instead of creating a duplicate.")
 
 # ===== SECTION 6: MANAGE EXISTING BUDGETS =====
