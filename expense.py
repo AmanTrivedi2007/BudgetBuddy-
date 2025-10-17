@@ -1,8 +1,12 @@
 # expense.py
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 from database import add_expense_to_db, get_all_expenses, get_all_income, get_all_goals, delete_expense_from_db
+
+# Import shared categories
+from categories import EXPENSE_CATEGORIES
 
 st.title("💳 Expense Tracking")
 
@@ -31,15 +35,15 @@ with st.form("expense_form"):
     col1, col2 = st.columns(2)
     
     with col1:
-        expense_category = st.selectbox("Category", 
-            ["Food", "Transport", "Bills", "Entertainment", "Shopping", "Healthcare", "Education", "Other"])
-        expense_amount = st.number_input("Amount (₹)", min_value=0.0, step=50.0)
+        # UPDATED: Using shared categories from categories.py
+        expense_category = st.selectbox("Category*", EXPENSE_CATEGORIES)
+        expense_amount = st.number_input("Amount (₹)*", min_value=0.0, step=50.0)
     
     with col2:
-        expense_date = st.date_input("Date", value=datetime.now())
+        expense_date = st.date_input("Date*", value=datetime.now())
         expense_description = st.text_input("Description (optional)")
     
-    submitted = st.form_submit_button("💾 Add Expense")
+    submitted = st.form_submit_button("💾 Add Expense", use_container_width=True, type="primary")
     
     if submitted and expense_amount > 0:
         # Reload to get latest balance
@@ -93,10 +97,13 @@ col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric("Total Income", f"₹{total_income:,.2f}")
+
 with col2:
     st.metric("Total Expenses", f"₹{total_expense:,.2f}")
+
 with col3:
     st.metric("Saved in Goals", f"₹{total_saved_in_goals:,.2f}")
+
 with col4:
     # Show balance with color indicator
     if balance < 0:
@@ -130,10 +137,13 @@ if total_income > 0:
     st.markdown("#### 📊 Income Allocation")
     
     col_a, col_b, col_c = st.columns(3)
+    
     with col_a:
         st.metric("Spent", f"{expense_percentage:.1f}%")
+    
     with col_b:
         st.metric("Saved", f"{goals_percentage:.1f}%")
+    
     with col_c:
         st.metric("Available", f"{available_percentage:.1f}%")
 
@@ -147,13 +157,17 @@ if expense_list:
     
     # Display options
     col_view1, col_view2 = st.columns(2)
+    
     with col_view1:
         sort_by = st.selectbox("Sort by", ["Most Recent", "Highest Amount", "Category"])
+    
     with col_view2:
-        filter_category = st.selectbox("Filter Category", ["All"] + ["Food", "Transport", "Bills", "Entertainment", "Shopping", "Healthcare", "Education", "Other"])
+        # UPDATED: Filter uses shared categories
+        filter_category = st.selectbox("Filter Category", ["All"] + EXPENSE_CATEGORIES)
     
     # Apply filters
     display_df = df.copy()
+    
     if filter_category != "All":
         display_df = display_df[display_df['category'] == filter_category]
     
@@ -174,6 +188,7 @@ if expense_list:
         category_summary.columns = ['Category', 'Total (₹)', 'Count', 'Avg (₹)']
         category_summary['% of Total'] = (category_summary['Total (₹)'] / category_summary['Total (₹)'].sum() * 100).round(1)
         category_summary = category_summary.sort_values('Total (₹)', ascending=False)
+        
         st.dataframe(category_summary, use_container_width=True)
     
     # Download button
@@ -184,6 +199,7 @@ if expense_list:
         return dataframe.to_csv(index=False).encode('utf-8')
     
     csv = convert_to_csv(df)
+    
     st.download_button(
         label="📥 Download Expense Data",
         data=csv,
@@ -197,7 +213,8 @@ if expense_list:
         
         # Show expenses in reverse chronological order for deletion
         expense_list_sorted = sorted(expense_list, key=lambda x: x['date'], reverse=True)
-        delete_id = st.selectbox("Select entry to delete", 
+        
+        delete_id = st.selectbox("Select entry to delete",
             options=[f"{item['id']} - {item['date']} - {item['category']} - ₹{item['amount']:,.2f}" for item in expense_list_sorted])
         
         if st.button("🗑️ Confirm Delete", type="primary"):
