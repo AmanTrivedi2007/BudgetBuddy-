@@ -28,9 +28,7 @@ from database import (
     get_all_recurring_transactions,
     add_recurring_transaction,
     delete_recurring_transaction,
-    process_recurring_transactions,
-    get_all_income,
-    get_all_expenses
+    process_recurring_transactions
 )
 
 # ===== HELPER FUNCTIONS =====
@@ -106,77 +104,6 @@ def display_transaction_card(transaction, trans_type):
 due_count = process_recurring_transactions(user_id)
 if due_count > 0:
     st.success(f"✅ Processed {due_count} recurring transaction(s) automatically!")
-
-# ===== INFORMATION BOX - EXPLAIN THE SYSTEM =====
-with st.expander("ℹ️ **How Recurring Transactions Work** (IMPORTANT - Please Read!)", expanded=False):
-    st.markdown("""
-    ### 📊 Understanding Recurring vs Manual Transactions
-    
-    **🔄 Recurring Transactions (This Page):**
-    - Set up AUTOMATIC future transactions (salary, rent, bills)
-    - System auto-adds them to Income/Expense on due date
-    - Shows SCHEDULED transactions (not yet processed)
-    
-    **💰 Income & 💳 Expense Pages:**
-    - Shows ALL completed transactions (manual + auto-processed)
-    - Manual entries = one-time transactions
-    - Auto entries = marked with "[Recurring]" tag
-    
-    ### ✅ How They Connect:
-    
-    ```
-    You add recurring → Stored here → Auto-copies on due date → Shows in Income/Expense
-    ```
-    
-    ### 📝 Example:
-    1. **You add** "Salary ₹50,000 Monthly" here
-    2. **On 1st of month** → System auto-adds to Income page
-    3. **Income page shows** "[Recurring] Salary ₹50,000"
-    4. **You manually add** "Bonus ₹10,000" in Income page
-    5. **Income page shows both** recurring salary + manual bonus
-    6. **This page shows** only the recurring salary (future schedule)
-    
-    ### 🎯 Key Points:
-    - ✅ Recurring page = **Future scheduled** transactions
-    - ✅ Income/Expense pages = **All actual** transactions
-    - ✅ Manual entries won't show here (they're one-time!)
-    - ✅ Look for "[Recurring]" tag in Income/Expense to see auto-processed ones
-    """)
-
-# ===== SHOW RECENTLY PROCESSED RECURRING TRANSACTIONS =====
-st.markdown("---")
-st.subheader("📌 Recently Auto-Processed Transactions")
-
-# Get recent income and expenses
-all_income = get_all_income(user_id)
-all_expenses = get_all_expenses(user_id)
-
-# Filter for recurring ones (with [Recurring] tag)
-recent_recurring_income = [i for i in all_income if i.get('notes', '').startswith('[Recurring]')][:5]
-recent_recurring_expenses = [e for e in all_expenses if e.get('description', '').startswith('[Recurring]')][:5]
-
-if recent_recurring_income or recent_recurring_expenses:
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("##### 💵 Recent Auto-Processed Income")
-        if recent_recurring_income:
-            for income in recent_recurring_income:
-                st.success(f"✅ {income['source']} - ₹{income['amount']:,.0f} on {income['date']}")
-        else:
-            st.info("No auto-processed income yet")
-    
-    with col2:
-        st.markdown("##### 💳 Recent Auto-Processed Expenses")
-        if recent_recurring_expenses:
-            for expense in recent_recurring_expenses:
-                st.error(f"✅ {expense['category']} - ₹{expense['amount']:,.0f} on {expense['date']}")
-        else:
-            st.info("No auto-processed expenses yet")
-    
-    st.caption("💡 These transactions were automatically added from your recurring schedule")
-else:
-    st.info("💡 No auto-processed transactions yet. Your scheduled transactions will appear here after processing.")
 
 # ===== SECTION 1: ADD NEW RECURRING TRANSACTION WITH TABS =====
 st.markdown("---")
@@ -258,7 +185,6 @@ with income_tab:
                     yearly_impact = monthly_impact * 12
                     
                     st.success(f"✅ Recurring income added: **{income_category}** - ₹{income_amount:,.0f} ({income_frequency})")
-                    st.info(f"🔔 This will automatically appear in your Income page starting {income_start_date}")
                     
                     # Show impact breakdown
                     st.markdown("##### 💰 Financial Impact Breakdown")
@@ -354,7 +280,6 @@ with expense_tab:
                     yearly_impact = monthly_impact * 12
                     
                     st.success(f"✅ Recurring expense added: **{expense_category}** - ₹{expense_amount:,.0f} ({expense_frequency})")
-                    st.info(f"🔔 This will automatically appear in your Expense page starting {expense_start_date}")
                     
                     # Show impact breakdown
                     st.markdown("##### 💸 Financial Impact Breakdown")
@@ -379,8 +304,7 @@ with expense_tab:
 
 # ===== SECTION 2: RECURRING TRANSACTIONS OVERVIEW =====
 st.markdown("---")
-st.subheader("📊 Your Scheduled Recurring Transactions")
-st.caption("💡 These are FUTURE transactions that will be auto-added to Income/Expense pages")
+st.subheader("📊 Your Recurring Transactions")
 
 # Get all recurring transactions
 recurring_transactions = get_all_recurring_transactions(user_id)
@@ -440,8 +364,7 @@ if recurring_transactions:
     
     with tab1:
         if recurring_income:
-            st.markdown("### Scheduled Recurring Income")
-            st.caption("🔔 These will be automatically added to your Income page on the due date")
+            st.markdown("### Recurring Income")
             
             for transaction in recurring_income:
                 display_transaction_card(transaction, 'Income')
@@ -458,8 +381,7 @@ if recurring_transactions:
     
     with tab2:
         if recurring_expenses:
-            st.markdown("### Scheduled Recurring Expenses")
-            st.caption("🔔 These will be automatically added to your Expense page on the due date")
+            st.markdown("### Recurring Expenses")
             
             for transaction in recurring_expenses:
                 display_transaction_card(transaction, 'Expense')
@@ -585,6 +507,33 @@ else:
         - 🏦 Insurance Premiums
         - 🏋️ Gym Membership
         """)
+
+# ===== TIPS SECTION =====
+st.markdown("---")
+with st.expander("💡 How Recurring Transactions Work", expanded=False):
+    st.markdown("""
+    ### Automatic Processing
+    
+    **How it works:**
+    1. Set up your recurring income and expenses once
+    2. System automatically adds them on the due date
+    3. You get notified when transactions are processed
+    4. All budgets and reports update automatically
+    
+    **Frequency Options:**
+    - **Daily**: Every day (e.g., daily allowance)
+    - **Weekly**: Every 7 days (e.g., weekly grocery shopping)
+    - **Monthly**: Once per month (e.g., salary, rent)
+    - **3 Months**: Every 3 months (e.g., quarterly bills)
+    - **6 Months**: Every 6 months (e.g., half-yearly insurance)
+    - **Yearly**: Once per year (e.g., annual subscriptions)
+    
+    **Tips:**
+    - Set up all regular transactions for better budgeting
+    - Check upcoming transactions in the overview
+    - Update amounts if they change
+    - Delete completed or cancelled transactions
+    """)
 
 # Footer
 st.markdown("---")
