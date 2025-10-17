@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import os
+import hashlib
 
 # Database file name
 DB_FILE = "budgetbuddy.db"
@@ -79,6 +80,16 @@ def init_database():
             date TEXT NOT NULL,
             note TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # NEW: Login attempts table (persistent across reboots)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            username_hash TEXT PRIMARY KEY,
+            attempts INTEGER DEFAULT 0,
+            last_attempt_time REAL,
+            locked_until REAL
         )
     ''')
     
@@ -269,5 +280,43 @@ def delete_goal_from_db(user_id, goal_name):
     cursor.execute('DELETE FROM goal_transactions WHERE goal_name = ? AND user_id = ?', (goal_name, user_id))
     cursor.execute('DELETE FROM goals WHERE name = ? AND user_id = ?', (goal_name, user_id))
     
+    conn.commit()
+    conn.close()
+
+# ===== LOGIN ATTEMPTS FUNCTIONS (NEW) =====
+def get_login_attempts(username):
+    """Get login attempts from database"""
+    username_hash = hashlib.sha256(username.lower().encode()).hexdigest()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT attempts, last_attempt_time, locked_until FROM login_attempts WHERE username_hash = ?', (username_hash,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if result:
+        return {'attempts': result[0], 'last_attempt_time': result[1], 'locked_until': result[2]}
+    return None
+
+def update_login_attempts(username, attempts, locked_until=None):
+    """Update login attempts in database"""
+    import time
+    username_hash = hashlib.sha256(username.lower().encode()).hexdigest()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT OR REPLACE INTO login_attempts (username_hash, attempts, last_attempt_time, locked_until)
+        VALUES (?, ?, ?, ?)
+    ''', (username_hash, attempts, time.time(), locked_until))
+    
+    conn.commit()
+    conn.close()
+
+def reset_login_attempts(username):
+    """Reset login attempts for user"""
+    username_hash = hashlib.sha256(username.lower().encode()).hexdigest()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM login_attempts WHERE username_hash = ?', (username_hash,))
     conn.commit()
     conn.close()
