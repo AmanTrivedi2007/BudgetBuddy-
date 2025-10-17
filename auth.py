@@ -22,7 +22,7 @@ def init_users_table():
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
-            email TEXT UNIQUE,
+            email_hash TEXT UNIQUE,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -67,23 +67,43 @@ def hash_password(password, salt=None):
     
     return password_hash, salt
 
+def hash_email(email):
+    """Hash email using SHA-256 for secure storage"""
+    if not email:
+        return None
+    # Convert to lowercase and hash
+    email_lower = email.lower().strip()
+    email_hash = hashlib.sha256(email_lower.encode('utf-8')).hexdigest()
+    return email_hash
+
+def verify_email(email, stored_hash):
+    """Verify email against stored hash"""
+    if not email or not stored_hash:
+        return False
+    email_hash = hash_email(email)
+    return email_hash == stored_hash
+
 def verify_password(password, stored_hash, salt):
     """Verify password against stored hash and salt"""
     password_hash, _ = hash_password(password, salt)
     return password_hash == stored_hash
 
 def create_user(full_name, username, password, email=None):
-    """Create new user in database"""
+    """Create new user in database with hashed email"""
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
+        # Hash password
         password_hash, salt = hash_password(password)
         
+        # Hash email if provided
+        email_hash = hash_email(email) if email else None
+        
         cursor.execute('''
-            INSERT INTO users (full_name, username, password_hash, salt, email)
+            INSERT INTO users (full_name, username, password_hash, salt, email_hash)
             VALUES (?, ?, ?, ?, ?)
-        ''', (full_name, username, password_hash, salt, email))
+        ''', (full_name, username, password_hash, salt, email_hash))
         
         conn.commit()
         conn.close()
@@ -104,16 +124,29 @@ def authenticate_user(username, password):
         return True, result[2]
     return False, None
 
+def check_email_exists(email):
+    """Check if email already exists (used for future password reset)"""
+    if not email:
+        return False
+    
+    email_hash = hash_email(email)
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT username FROM users WHERE email_hash = ?', (email_hash,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    return result[0] if result else None
+
 def check_rate_limit(username):
     """Check if user exceeded login attempts"""
     if username in LOGIN_ATTEMPTS:
         attempts, last_time = LOGIN_ATTEMPTS[username]
         if attempts >= 5:
-            # Block for 15 minutes
             if time.time() - last_time < 900:
                 return False, int((900 - (time.time() - last_time)) / 60)
             else:
-                # Reset after cooldown
                 LOGIN_ATTEMPTS[username] = (0, time.time())
     return True, 0
 
@@ -135,7 +168,6 @@ def check_authentication():
     
     init_users_table()
     
-    # Initialize session state
     if 'username' not in st.session_state:
         st.session_state.username = None
     if 'full_name' not in st.session_state:
@@ -145,9 +177,8 @@ def check_authentication():
     if 'login_time' not in st.session_state:
         st.session_state.login_time = None
     
-    # If already logged in, check session timeout
+    # Session timeout check
     if st.session_state.username:
-        # Check session timeout (30 minutes)
         if st.session_state.login_time:
             elapsed = time.time() - st.session_state.login_time
             if elapsed > 1800:  # 30 minutes
@@ -159,7 +190,7 @@ def check_authentication():
         
         return st.session_state.username
     
-    # Show login/signup page
+    # Styling
     st.markdown("""
         <style>
         .big-title {
@@ -181,7 +212,7 @@ def check_authentication():
     st.markdown("### Your Personal Finance Companion")
     st.markdown("---")
     
-    # Toggle between Login and Sign Up
+    # Login/Signup toggle
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔐 Login", use_container_width=True, 
@@ -204,7 +235,7 @@ def check_authentication():
             full_name = st.text_input("Full Name*", placeholder="e.g., Rahul Kumar",
                                       help="Enter your complete name")
             email = st.text_input("Email (optional)", placeholder="rahul@example.com",
-                                 help="For future account recovery features")
+                                 help="For future password reset feature - Email will be encrypted")
             password = st.text_input("Password*", type="password",
                                     help="Minimum 6 characters - Choose a strong password")
             confirm_password = st.text_input("Confirm Password*", type="password",
@@ -213,6 +244,7 @@ def check_authentication():
             signup_submitted = st.form_submit_button("🚀 Create Account", use_container_width=True)
             
             if signup_submitted:
+                # Validation
                 if not full_name or len(full_name.strip()) < 2:
                     st.error("❌ Please enter your full name (minimum 2 characters)")
                 elif len(password) < 6:
@@ -222,28 +254,37 @@ def check_authentication():
                 elif email and not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
                     st.error("❌ Invalid email format")
                 else:
-                    generated_username = generate_unique_username(full_name)
-                    
-                    if create_user(full_name, generated_username, password, email):
-                        st.success(f"✅ Account created successfully!")
-                        st.info(f"🔑 **Your Username:** `{generated_username}`")
-                        st.warning("⚠️ **IMPORTANT:** Save this username! You'll need it to login.")
-                        st.balloons()
-                        
-                        st.code(generated_username, language="text")
-                        
-                        st.markdown("---")
-                        if st.button("➡️ Go to Login Page", use_container_width=True, type="primary"):
-                            st.session_state.auth_mode = 'login'
-                            st.rerun()
+                    # Check if email already exists (if provided)
+                    if email and check_email_exists(email):
+                        st.error("❌ This email is already registered. Use a different email.")
                     else:
-                        st.error("❌ Error creating account. Please try a different name.")
+                        generated_username = generate_unique_username(full_name)
+                        
+                        if create_user(full_name, generated_username, password, email):
+                            st.success(f"✅ Account created successfully!")
+                            st.info(f"🔑 **Your Username:** `{generated_username}`")
+                            st.warning("⚠️ **IMPORTANT:** Save this username! You'll need it to login.")
+                            
+                            if email:
+                                st.success("✅ Email encrypted and saved for password recovery!")
+                            
+                            st.balloons()
+                            
+                            st.code(generated_username, language="text")
+                            
+                            st.markdown("---")
+                            if st.button("➡️ Go to Login Page", use_container_width=True, type="primary"):
+                                st.session_state.auth_mode = 'login'
+                                st.rerun()
+                        else:
+                            st.error("❌ Error creating account. Please try a different name.")
         
         st.info("""
-        💡 **How Username Generation Works:**
-        - "Rahul Kumar" → username: `rahulk`
-        - "Priya" → username: `priya`
-        - If username exists, adds number: `rahulk1`, `rahulk2`
+        💡 **Security Features:**
+        - Your password is encrypted with SHA-256 + unique salt
+        - Your email (if provided) is encrypted with SHA-256
+        - No plain text sensitive data stored
+        - Username format: firstname + first letter of lastname
         """)
     
     # LOGIN MODE
@@ -264,21 +305,17 @@ def check_authentication():
                 if not username_input or not password_input:
                     st.error("❌ Please enter both username and password")
                 else:
-                    # Check rate limiting
                     allowed, minutes_left = check_rate_limit(username_input)
                     
                     if not allowed:
                         st.error(f"🚫 Too many failed attempts. Try again in {minutes_left} minutes.")
                         st.warning("🔒 Your account is temporarily locked for security.")
                     else:
-                        # Authenticate
                         success, full_name = authenticate_user(username_input, password_input)
                         
                         if success:
-                            # Reset failed attempts
                             reset_attempts(username_input)
                             
-                            # Set session
                             st.session_state.username = username_input
                             st.session_state.full_name = full_name
                             st.session_state.login_time = time.time()
@@ -287,7 +324,6 @@ def check_authentication():
                             st.balloons()
                             st.rerun()
                         else:
-                            # Record failed attempt
                             record_failed_attempt(username_input)
                             
                             attempts = LOGIN_ATTEMPTS.get(username_input, (0, 0))[0]
@@ -318,9 +354,9 @@ def check_authentication():
         st.caption("Analyze spending patterns")
     
     st.markdown("---")
-    st.caption("🔒 Your password is encrypted with SHA-256 + Salt")
-    st.caption("🛡️ Each user has isolated, private data")
-    st.caption("⏱️ Auto-logout after 30 minutes of inactivity")
-    st.caption("🚫 Rate limiting: 5 login attempts per 15 minutes")
+    st.caption("🔒 Password: SHA-256 + Salt encryption")
+    st.caption("📧 Email: SHA-256 hashed (optional field)")
+    st.caption("⏱️ Auto-logout after 30 minutes")
+    st.caption("🚫 Rate limiting: 5 attempts per 15 minutes")
     
     st.stop()
