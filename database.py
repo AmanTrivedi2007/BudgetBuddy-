@@ -1,4 +1,6 @@
-# database.py - Complete Database with Budget, Recurring Transactions, User Preferences & All Features
+# database.py - Complete Database with Budget, Recurring Transactions, 2FA & SOC 2 Audit Trail
+
+# Enhanced Security Features: Two-Factor Authentication + Audit Logging
 
 import sqlite3
 import pandas as pd
@@ -6,60 +8,16 @@ from datetime import datetime, timedelta
 import os
 import hashlib
 import calendar
+import json
 
 # Database file name
 DB_FILE = "budgetbuddy.db"
 
-# ===== DATABASE INITIALIZATION =====
+# ========================================
+# DATABASE INITIALIZATION (FIXED - NO AUTO-DELETION)
+# ========================================
 def init_database():
-    """Initialize database - auto-migrates old schema to new"""
-    # Check if database needs migration
-    if os.path.exists(DB_FILE):
-        try:
-            conn = sqlite3.connect(DB_FILE)
-            cursor = conn.cursor()
-            
-            # Check if users table exists and has correct structure
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-            users_table_exists = cursor.fetchone()
-            
-            if users_table_exists:
-                # Check users table columns
-                cursor.execute("PRAGMA table_info(users)")
-                user_columns = [col[1] for col in cursor.fetchall()]
-                
-                # If old schema (has 'username' instead of 'username_hash'), delete database
-                if 'username' in user_columns and 'username_hash' not in user_columns:
-                    conn.close()
-                    os.remove(DB_FILE)
-                    print("✅ Old schema detected - recreating database")
-                elif 'email_hash' not in user_columns:
-                    # Missing email_hash column, recreate
-                    conn.close()
-                    os.remove(DB_FILE)
-                    print("✅ Missing email_hash column - recreating database")
-                else:
-                    conn.close()
-                    # Schema is correct, just ensure all tables exist
-            else:
-                # Users table doesn't exist, check income table
-                cursor.execute("PRAGMA table_info(income)")
-                income_columns = [col[1] for col in cursor.fetchall()]
-                conn.close()
-                
-                if 'user_id' not in income_columns:
-                    os.remove(DB_FILE)
-                    print("✅ Old database format - recreating")
-                    
-        except Exception as e:
-            # Any error, just recreate
-            try:
-                os.remove(DB_FILE)
-                print(f"✅ Database error - recreating: {e}")
-            except:
-                pass
-    
-    # Create all tables with correct schema
+    """Initialize database - creates tables if they don't exist, preserves all data"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
@@ -172,7 +130,7 @@ def init_database():
         )
     ''')
     
-    # NEW: Create user preferences table (for tutorial completion, dark mode, etc.)
+    # Create user preferences table (for tutorial completion, dark mode, etc.)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_preferences (
             user_id TEXT NOT NULL,
@@ -183,22 +141,385 @@ def init_database():
         )
     ''')
     
+    # ========================================
+    # SECURITY TABLES
+    # ========================================
+    
+    # Two-Factor Authentication table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS two_factor_auth (
+            user_id TEXT PRIMARY KEY,
+            secret_key TEXT NOT NULL,
+            backup_codes TEXT,
+            enabled BOOLEAN DEFAULT 0,
+            last_used TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Audit Logs table (SOC 2 Compliance)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            user_id TEXT,
+            action TEXT NOT NULL,
+            category TEXT NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            details TEXT,
+            status TEXT DEFAULT 'SUCCESS',
+            session_id TEXT
+        )
+    ''')
+    
+    # Create indexes for faster audit queries
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_logs(category)')
+    
     conn.commit()
     conn.close()
-    print("✅ Database initialized successfully")
+    print("✅ Database initialized successfully with security features!")
 
 
-# ===== INCOME FUNCTIONS =====
+# ========================================
+# TWO-FACTOR AUTHENTICATION FUNCTIONS
+# ========================================
+def enable_2fa_for_user(user_id, secret_key, backup_codes):
+    """Enable 2FA for a user"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # Convert backup codes list to JSON string
+        backup_codes_json = json.dumps(backup_codes)
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO two_factor_auth (user_id, secret_key, backup_codes, enabled)
+            VALUES (?, ?, ?, 1)
+        ''', (user_id, secret_key, backup_codes_json))
+        
+        conn.commit()
+        conn.close()
+        
+        # Log the event
+        log_audit_event(user_id, "2FA_ENABLED", "SECURITY",
+                       {"message": "Two-factor authentication enabled"}, "SUCCESS")
+        return True
+    except Exception as e:
+        print(f"Error enabling 2FA: {e}")
+        log_audit_event(user_id, "2FA_ENABLE_FAILED", "SECURITY",
+                       {"error": str(e)}, "FAILURE")
+        return False
+
+def disable_2fa_for_user(user_id):
+    """Disable 2FA for a user"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE two_factor_auth
+            SET enabled = 0
+            WHERE user_id = ?
+        ''', (user_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        log_audit_event(user_id, "2FA_DISABLED", "SECURITY",
+                       {"message": "Two-factor authentication disabled"}, "SUCCESS")
+        return True
+    except Exception as e:
+        print(f"Error disabling 2FA: {e}")
+        return False
+
+def is_2fa_enabled(user_id):
+    """Check if 2FA is enabled for user"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT enabled FROM two_factor_auth
+            WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        return result[0] == 1 if result else False
+    except:
+        return False
+
+def get_2fa_secret(user_id):
+    """Get 2FA secret key for user"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT secret_key FROM two_factor_auth
+            WHERE user_id = ? AND enabled = 1
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        return result[0] if result else None
+    except:
+        return None
+
+def get_backup_codes(user_id):
+    """Get backup codes for user"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT backup_codes FROM two_factor_auth
+            WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            return json.loads(result[0])
+        return []
+    except:
+        return []
+
+def use_backup_code(user_id, code):
+    """Use a backup code and remove it from list"""
+    try:
+        backup_codes = get_backup_codes(user_id)
+        
+        if code in backup_codes:
+            backup_codes.remove(code)
+            
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE two_factor_auth
+                SET backup_codes = ?, last_used = ?
+                WHERE user_id = ?
+            ''', (json.dumps(backup_codes), datetime.now().isoformat(), user_id))
+            
+            conn.commit()
+            conn.close()
+            
+            log_audit_event(user_id, "2FA_BACKUP_CODE_USED", "SECURITY",
+                           {"message": f"Backup code used. {len(backup_codes)} codes remaining"}, "SUCCESS")
+            return True
+        return False
+    except Exception as e:
+        print(f"Error using backup code: {e}")
+        return False
+
+def update_2fa_last_used(user_id):
+    """Update last used timestamp for 2FA"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            UPDATE two_factor_auth
+            SET last_used = ?
+            WHERE user_id = ?
+        ''', (datetime.now().isoformat(), user_id))
+        
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+
+# ========================================
+# AUDIT LOGGING FUNCTIONS (SOC 2)
+# ========================================
+def log_audit_event(user_id, action, category, details=None, status="SUCCESS", ip_address=None, user_agent=None, session_id=None):
+    """
+    Log an audit event for SOC 2 compliance
+    
+    Parameters:
+    - user_id: User identifier
+    - action: Action performed (e.g., LOGIN_SUCCESS, ADD_EXPENSE, DELETE_BUDGET)
+    - category: Category (AUTH, TRANSACTION, BUDGET, GOAL, SECURITY, DATA)
+    - details: Additional details as dictionary
+    - status: SUCCESS, FAILURE, WARNING
+    - ip_address: User's IP address
+    - user_agent: Browser/device information
+    - session_id: Session identifier
+    """
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # Convert details dict to JSON
+        details_json = json.dumps(details) if details else None
+        
+        cursor.execute('''
+            INSERT INTO audit_logs
+            (user_id, action, category, ip_address, user_agent, details, status, session_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, action, category, ip_address, user_agent, details_json, status, session_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Audit logging error: {e}")
+        return False
+
+def get_audit_logs(user_id=None, limit=100, action=None, category=None, start_date=None, end_date=None):
+    """
+    Retrieve audit logs with optional filters
+    
+    Parameters:
+    - user_id: Filter by user (None = all users)
+    - limit: Maximum number of records
+    - action: Filter by specific action
+    - category: Filter by category
+    - start_date: Filter from date (YYYY-MM-DD)
+    - end_date: Filter to date (YYYY-MM-DD)
+    """
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        query = "SELECT * FROM audit_logs WHERE 1=1"
+        params = []
+        
+        if user_id:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        
+        if action:
+            query += " AND action = ?"
+            params.append(action)
+        
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+        
+        if start_date:
+            query += " AND DATE(timestamp) >= ?"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND DATE(timestamp) <= ?"
+            params.append(end_date)
+        
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        columns = [description[0] for description in cursor.description]
+        
+        results = []
+        for row in cursor.fetchall():
+            log_dict = dict(zip(columns, row))
+            # Parse JSON details
+            if log_dict.get('details'):
+                try:
+                    log_dict['details'] = json.loads(log_dict['details'])
+                except:
+                    pass
+            results.append(log_dict)
+        
+        conn.close()
+        return results
+    except Exception as e:
+        print(f"Error retrieving audit logs: {e}")
+        return []
+
+def get_audit_summary(user_id, days=30):
+    """Get audit summary statistics for user"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # Total events
+        cursor.execute('''
+            SELECT COUNT(*) FROM audit_logs
+            WHERE user_id = ? AND DATE(timestamp) >= DATE('now', '-' || ? || ' days')
+        ''', (user_id, days))
+        total_events = cursor.fetchone()[0]
+        
+        # Events by category
+        cursor.execute('''
+            SELECT category, COUNT(*) as count FROM audit_logs
+            WHERE user_id = ? AND DATE(timestamp) >= DATE('now', '-' || ? || ' days')
+            GROUP BY category
+            ORDER BY count DESC
+        ''', (user_id, days))
+        by_category = dict(cursor.fetchall())
+        
+        # Failed attempts
+        cursor.execute('''
+            SELECT COUNT(*) FROM audit_logs
+            WHERE user_id = ? AND status = 'FAILURE'
+            AND DATE(timestamp) >= DATE('now', '-' || ? || ' days')
+        ''', (user_id, days))
+        failed_attempts = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return {
+            'total_events': total_events,
+            'by_category': by_category,
+            'failed_attempts': failed_attempts,
+            'period_days': days
+        }
+    except Exception as e:
+        print(f"Error getting audit summary: {e}")
+        return None
+
+def export_audit_logs_csv(user_id=None, filename="audit_logs.csv"):
+    """Export audit logs to CSV file"""
+    try:
+        logs = get_audit_logs(user_id=user_id, limit=10000)
+        if not logs:
+            return False
+        
+        df = pd.DataFrame(logs)
+        df.to_csv(filename, index=False)
+        
+        log_audit_event(user_id or "SYSTEM", "AUDIT_EXPORT", "DATA",
+                       {"filename": filename, "record_count": len(logs)}, "SUCCESS")
+        return True
+    except Exception as e:
+        print(f"Error exporting audit logs: {e}")
+        return False
+
+
+# ========================================
+# INCOME FUNCTIONS (WITH AUDIT LOGGING)
+# ========================================
 def add_income_to_db(user_id, source, amount, date, notes=""):
     """Add income record to database"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO income (user_id, source, amount, date, notes)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user_id, source, amount, str(date), notes))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO income (user_id, source, amount, date, notes)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, source, amount, str(date), notes))
+        conn.commit()
+        conn.close()
+        
+        # Log the audit event
+        log_audit_event(user_id, "ADD_INCOME", "TRANSACTION",
+                       {"source": source, "amount": amount, "date": str(date)}, "SUCCESS")
+        return True
+    except Exception as e:
+        log_audit_event(user_id, "ADD_INCOME_FAILED", "TRANSACTION",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 def get_all_income(user_id):
     """Get all income records for specific user"""
@@ -221,24 +542,45 @@ def get_all_income(user_id):
 
 def delete_income_from_db(user_id, income_id):
     """Delete income record from database"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM income WHERE id = ? AND user_id = ?', (income_id, user_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM income WHERE id = ? AND user_id = ?', (income_id, user_id))
+        conn.commit()
+        conn.close()
+        
+        log_audit_event(user_id, "DELETE_INCOME", "TRANSACTION",
+                       {"income_id": income_id}, "SUCCESS")
+        return True
+    except Exception as e:
+        log_audit_event(user_id, "DELETE_INCOME_FAILED", "TRANSACTION",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 
-# ===== EXPENSE FUNCTIONS =====
+# ========================================
+# EXPENSE FUNCTIONS (WITH AUDIT LOGGING)
+# ========================================
 def add_expense_to_db(user_id, category, amount, date, description=""):
     """Add expense record to database"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO expenses (user_id, category, amount, date, description)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user_id, category, amount, str(date), description))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO expenses (user_id, category, amount, date, description)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, category, amount, str(date), description))
+        conn.commit()
+        conn.close()
+        
+        # Log the audit event
+        log_audit_event(user_id, "ADD_EXPENSE", "TRANSACTION",
+                       {"category": category, "amount": amount, "date": str(date)}, "SUCCESS")
+        return True
+    except Exception as e:
+        log_audit_event(user_id, "ADD_EXPENSE_FAILED", "TRANSACTION",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 def get_all_expenses(user_id):
     """Get all expense records for specific user"""
@@ -261,25 +603,39 @@ def get_all_expenses(user_id):
 
 def delete_expense_from_db(user_id, expense_id):
     """Delete expense record from database"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM expenses WHERE id = ? AND user_id = ?', (expense_id, user_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM expenses WHERE id = ? AND user_id = ?', (expense_id, user_id))
+        conn.commit()
+        conn.close()
+        
+        log_audit_event(user_id, "DELETE_EXPENSE", "TRANSACTION",
+                       {"expense_id": expense_id}, "SUCCESS")
+        return True
+    except Exception as e:
+        log_audit_event(user_id, "DELETE_EXPENSE_FAILED", "TRANSACTION",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 
-# ===== GOAL FUNCTIONS =====
+# ========================================
+# GOAL FUNCTIONS (WITH AUDIT LOGGING)
+# ========================================
 def add_goal_to_db(user_id, name, target_amount, description=""):
     """Add new goal to database"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
     try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO goals (user_id, name, target_amount, saved_amount, description, created_date)
             VALUES (?, ?, ?, 0, ?, ?)
         ''', (user_id, name, target_amount, description, str(datetime.now().date())))
         conn.commit()
         conn.close()
+        
+        log_audit_event(user_id, "CREATE_GOAL", "GOAL",
+                       {"name": name, "target_amount": target_amount}, "SUCCESS")
         return True
     except sqlite3.IntegrityError:
         conn.close()
@@ -311,33 +667,51 @@ def get_all_goals(user_id):
 
 def add_money_to_goal(user_id, goal_name, amount, note=""):
     """Add money to a specific goal"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE goals SET saved_amount = saved_amount + ?
-        WHERE name = ? AND user_id = ?
-    ''', (amount, goal_name, user_id))
-    cursor.execute('''
-        INSERT INTO goal_transactions (user_id, goal_name, amount, date, note)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user_id, goal_name, amount, str(datetime.now().date()), note))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE goals SET saved_amount = saved_amount + ?
+            WHERE name = ? AND user_id = ?
+        ''', (amount, goal_name, user_id))
+        cursor.execute('''
+            INSERT INTO goal_transactions (user_id, goal_name, amount, date, note)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, goal_name, amount, str(datetime.now().date()), note))
+        conn.commit()
+        conn.close()
+        
+        log_audit_event(user_id, "GOAL_DEPOSIT", "GOAL",
+                       {"goal_name": goal_name, "amount": amount}, "SUCCESS")
+        return True
+    except Exception as e:
+        log_audit_event(user_id, "GOAL_DEPOSIT_FAILED", "GOAL",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 def withdraw_from_goal(user_id, goal_name, amount, note=""):
     """Withdraw money from a specific goal"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE goals SET saved_amount = saved_amount - ?
-        WHERE name = ? AND user_id = ?
-    ''', (amount, goal_name, user_id))
-    cursor.execute('''
-        INSERT INTO goal_transactions (user_id, goal_name, amount, date, note)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user_id, goal_name, -amount, str(datetime.now().date()), note))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE goals SET saved_amount = saved_amount - ?
+            WHERE name = ? AND user_id = ?
+        ''', (amount, goal_name, user_id))
+        cursor.execute('''
+            INSERT INTO goal_transactions (user_id, goal_name, amount, date, note)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, goal_name, -amount, str(datetime.now().date()), note))
+        conn.commit()
+        conn.close()
+        
+        log_audit_event(user_id, "GOAL_WITHDRAWAL", "GOAL",
+                       {"goal_name": goal_name, "amount": amount}, "SUCCESS")
+        return True
+    except Exception as e:
+        log_audit_event(user_id, "GOAL_WITHDRAWAL_FAILED", "GOAL",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 def get_goal_transactions(user_id, goal_name):
     """Get all transactions for a specific goal"""
@@ -362,15 +736,26 @@ def get_goal_transactions(user_id, goal_name):
 
 def delete_goal_from_db(user_id, goal_name):
     """Delete goal and all its transactions"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM goal_transactions WHERE goal_name = ? AND user_id = ?', (goal_name, user_id))
-    cursor.execute('DELETE FROM goals WHERE name = ? AND user_id = ?', (goal_name, user_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM goal_transactions WHERE goal_name = ? AND user_id = ?', (goal_name, user_id))
+        cursor.execute('DELETE FROM goals WHERE name = ? AND user_id = ?', (goal_name, user_id))
+        conn.commit()
+        conn.close()
+        
+        log_audit_event(user_id, "DELETE_GOAL", "GOAL",
+                       {"goal_name": goal_name}, "SUCCESS")
+        return True
+    except Exception as e:
+        log_audit_event(user_id, "DELETE_GOAL_FAILED", "GOAL",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 
-# ===== LOGIN ATTEMPTS FUNCTIONS =====
+# ========================================
+# LOGIN ATTEMPTS FUNCTIONS
+# ========================================
 def get_login_attempts(username):
     """Get login attempts from database"""
     username_hash = hashlib.sha256(username.lower().encode()).hexdigest()
@@ -407,7 +792,9 @@ def reset_login_attempts(username):
     conn.close()
 
 
-# ===== BUDGET MANAGEMENT FUNCTIONS =====
+# ========================================
+# BUDGET MANAGEMENT FUNCTIONS (WITH AUDIT LOGGING)
+# ========================================
 def get_all_budgets(user_id):
     """Get all budgets for specific user"""
     conn = sqlite3.connect(DB_FILE)
@@ -434,15 +821,18 @@ def get_all_budgets(user_id):
 
 def add_budget_to_db(user_id, category, limit_amount, alert_50=True, alert_75=True, alert_90=True, notes=""):
     """Add new budget to database"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
     try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO budgets (user_id, category, limit_amount, alert_50, alert_75, alert_90, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (user_id, category, limit_amount, alert_50, alert_75, alert_90, notes))
         conn.commit()
         conn.close()
+        
+        log_audit_event(user_id, "CREATE_BUDGET", "BUDGET",
+                       {"category": category, "limit_amount": limit_amount}, "SUCCESS")
         return True
     except sqlite3.IntegrityError:
         conn.close()
@@ -450,27 +840,45 @@ def add_budget_to_db(user_id, category, limit_amount, alert_50=True, alert_75=Tr
 
 def update_budget(user_id, category, limit_amount, alert_50=True, alert_75=True, alert_90=True, notes=""):
     """Update existing budget"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE budgets
-        SET limit_amount = ?, alert_50 = ?, alert_75 = ?, alert_90 = ?, notes = ?
-        WHERE user_id = ? AND category = ?
-    ''', (limit_amount, alert_50, alert_75, alert_90, notes, user_id, category))
-    rows_affected = cursor.rowcount
-    conn.commit()
-    conn.close()
-    return rows_affected > 0
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE budgets
+            SET limit_amount = ?, alert_50 = ?, alert_75 = ?, alert_90 = ?, notes = ?
+            WHERE user_id = ? AND category = ?
+        ''', (limit_amount, alert_50, alert_75, alert_90, notes, user_id, category))
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        if rows_affected > 0:
+            log_audit_event(user_id, "UPDATE_BUDGET", "BUDGET",
+                           {"category": category, "new_limit": limit_amount}, "SUCCESS")
+        return rows_affected > 0
+    except Exception as e:
+        log_audit_event(user_id, "UPDATE_BUDGET_FAILED", "BUDGET",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 def delete_budget(user_id, category):
     """Delete budget from database"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM budgets WHERE user_id = ? AND category = ?', (user_id, category))
-    rows_affected = cursor.rowcount
-    conn.commit()
-    conn.close()
-    return rows_affected > 0
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM budgets WHERE user_id = ? AND category = ?', (user_id, category))
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        if rows_affected > 0:
+            log_audit_event(user_id, "DELETE_BUDGET", "BUDGET",
+                           {"category": category}, "SUCCESS")
+        return rows_affected > 0
+    except Exception as e:
+        log_audit_event(user_id, "DELETE_BUDGET_FAILED", "BUDGET",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 def get_category_spending(user_id, category, month):
     """Get total spending for a specific category in a specific month"""
@@ -487,7 +895,9 @@ def get_category_spending(user_id, category, month):
     return result[0] if result[0] is not None else 0.0
 
 
-# ===== RECURRING TRANSACTIONS FUNCTIONS =====
+# ========================================
+# RECURRING TRANSACTIONS FUNCTIONS (WITH AUDIT LOGGING)
+# ========================================
 def get_all_recurring_transactions(user_id):
     """Get all recurring transactions for user"""
     conn = sqlite3.connect(DB_FILE)
@@ -517,9 +927,9 @@ def get_all_recurring_transactions(user_id):
 
 def add_recurring_transaction(user_id, trans_type, category, amount, frequency, start_date, description=""):
     """Add new recurring transaction"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
     try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO recurring_transactions
             (user_id, type, category, amount, frequency, start_date, next_date, description)
@@ -527,21 +937,34 @@ def add_recurring_transaction(user_id, trans_type, category, amount, frequency, 
         ''', (user_id, trans_type, category, amount, frequency, start_date, start_date, description))
         conn.commit()
         conn.close()
+        
+        log_audit_event(user_id, "CREATE_RECURRING", "TRANSACTION",
+                       {"type": trans_type, "category": category, "amount": amount, "frequency": frequency}, "SUCCESS")
         return True
     except Exception as e:
         print(f"Error adding recurring transaction: {e}")
-        conn.close()
+        log_audit_event(user_id, "CREATE_RECURRING_FAILED", "TRANSACTION",
+                       {"error": str(e)}, "FAILURE")
         return False
 
 def delete_recurring_transaction(transaction_id):
     """Delete recurring transaction"""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM recurring_transactions WHERE id = ?', (transaction_id,))
-    rows_affected = cursor.rowcount
-    conn.commit()
-    conn.close()
-    return rows_affected > 0
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM recurring_transactions WHERE id = ?', (transaction_id,))
+        rows_affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        if rows_affected > 0:
+            log_audit_event("SYSTEM", "DELETE_RECURRING", "TRANSACTION",
+                           {"transaction_id": transaction_id}, "SUCCESS")
+        return rows_affected > 0
+    except Exception as e:
+        log_audit_event("SYSTEM", "DELETE_RECURRING_FAILED", "TRANSACTION",
+                       {"error": str(e)}, "FAILURE")
+        return False
 
 def get_recurring_transaction_by_id(transaction_id):
     """Get single recurring transaction by ID"""
@@ -643,10 +1066,16 @@ def process_recurring_transactions(user_id):
     
     conn.commit()
     conn.close()
+    
+    if processed_count > 0:
+        log_audit_event(user_id, "RECURRING_PROCESSED", "TRANSACTION",
+                       {"count": processed_count}, "SUCCESS")
     return processed_count
 
 
-# ===== USER PREFERENCES FUNCTIONS (NEW - FOR TUTORIAL PERSISTENCE) =====
+# ========================================
+# USER PREFERENCES FUNCTIONS
+# ========================================
 def save_user_preference(user_id, preference_key, preference_value):
     """Save user preference to database"""
     conn = sqlite3.connect(DB_FILE)
@@ -659,7 +1088,6 @@ def save_user_preference(user_id, preference_key, preference_value):
     
     conn.commit()
     conn.close()
-
 
 def get_user_preference(user_id, preference_key, default_value=None):
     """Get user preference from database"""
@@ -675,7 +1103,6 @@ def get_user_preference(user_id, preference_key, default_value=None):
     conn.close()
     
     return result[0] if result else default_value
-
 
 def delete_user_preference(user_id, preference_key):
     """Delete user preference from database"""
