@@ -19,7 +19,6 @@ try:
     AI_READY = True
 except:
     AI_READY = False
-    st.error("❌ **Add GOOGLE_AI_API_KEY to Streamlit Secrets!**")
 
 st.title("🤖 AI Budget Advisor")
 st.markdown("**Your Personal Finance Assistant - Powered by Google AI**")
@@ -115,7 +114,7 @@ monthly['Total'] = monthly.sum(axis=1)
 recent_months = monthly.tail(6)
 st.dataframe(recent_months.T.round(0).style.format('₹{:.0f}'), use_container_width=True)
 
-# MAIN AI CHAT INTERFACE
+# MAIN AI CHAT INTERFACE - FIXED FOR STREAMLIT CLOUD
 st.markdown("---")
 st.markdown("### 💬 **Chat with Your AI Budget Advisor**")
 st.markdown("*Ask about saving money, budget tips, spending patterns, or analysis*")
@@ -124,25 +123,35 @@ st.markdown("*Ask about saving money, budget tips, spending patterns, or analysi
 if st.session_state.ai_chat_history:
     st.markdown("---")
     for i, chat in enumerate(reversed(st.session_state.ai_chat_history[-12:])):
-        with st.chat_message("user"):
-            st.write(f"**You** ({chat.get('time', 'recent')})")
-            st.write(chat['question'])
-        with st.chat_message("assistant"):
-            st.write(f"**AI Advisor** ({chat.get('time', 'recent')})")
-            st.markdown(chat['answer'])
+        col1, col2 = st.columns([1, 8])
+        with col1:
+            st.markdown("👤")
+        with col2:
+            st.markdown(f"**You** ({chat.get('time', 'recent')}): {chat['question']}")
+        
+        col1, col2 = st.columns([1, 8])
+        with col1:
+            st.markdown("🤖")
+        with col2:
+            st.markdown(f"**AI**: {chat['answer']}")
 
-# Chat controls
+# Chat input - FIXED VERSION
+user_question = st.text_input(
+    "💭 Type your question (e.g., 'How can I save on food expenses?')", 
+    placeholder="Ask anything about your budget...",
+    label_visibility="collapsed"
+)
+
 col_btn1, col_btn2 = st.columns([3, 1])
 with col_btn1:
-    user_question = st.chat_input("💭 Type your question (e.g., 'How can I save on food expenses?')", 
-                                 placeholder="Ask anything about your budget...")
+    send_button = st.button("Send to AI", type="primary", use_container_width=True)
 with col_btn2:
     if st.button("🗑️ Clear History", type="secondary"):
         st.session_state.ai_chat_history = []
         st.rerun()
 
 # Send message to AI
-if user_question:
+if send_button and user_question.strip():
     # Build rich financial context
     top_category = df.groupby('category')['amount'].sum().idxmax()
     top_amount = df.groupby('category')['amount'].sum().max()
@@ -170,22 +179,20 @@ Keep response under 200 words. Focus on savings opportunities.
 """
     
     if AI_READY:
-        with st.chat_message("assistant"):
-            with st.spinner("🤖 AI analyzing your finances..."):
-                ai_answer = get_ai_insight(full_prompt)
-                st.markdown(ai_answer)
-                
-                # Save to chat history
-                st.session_state.ai_chat_history.append({
-                    'question': user_question,
-                    'answer': ai_answer,
-                    'time': datetime.now().strftime('%H:%M'),
-                    'total_spent': total_spent
-                })
-                st.rerun()
+        with st.spinner("🤖 AI analyzing your finances..."):
+            ai_answer = get_ai_insight(full_prompt)
+            
+            # Save to chat history
+            st.session_state.ai_chat_history.append({
+                'question': user_question,
+                'answer': ai_answer,
+                'time': datetime.now().strftime('%H:%M'),
+                'total_spent': total_spent
+            })
+            st.rerun()
     else:
         st.error("❌ **AI UNAVAILABLE** - Add `GOOGLE_AI_API_KEY` to Streamlit Secrets!")
-        st.info("✅ **ML predictions & charts work without API!**")
+        st.info("✅ **Charts & stats work without API!**")
 
 # Quick AI prompts
 st.markdown("---")
@@ -201,7 +208,7 @@ quick_prompts = [
 cols = st.columns(3)
 for i, prompt in enumerate(quick_prompts):
     if cols[i%3].button(prompt, key=f"quick_{i}", use_container_width=True):
-        st.chat_input(prompt)
+        st.session_state.user_question_temp = prompt
         st.rerun()
 
 # Stats footer
