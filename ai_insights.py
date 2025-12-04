@@ -15,7 +15,7 @@ st.set_page_config(page_title="AI Insights - BudgetBuddy", page_icon="🧠", lay
 # Secure Google AI API from Streamlit Secrets
 try:
     GOOGLE_AI_API_KEY = st.secrets["GOOGLE_AI_API_KEY"]
-    GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+    GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
     AI_READY = True
 except:
     AI_READY = False
@@ -222,3 +222,4 @@ with col3:
     st.metric("📈 Categories", df['category'].nunique())
 
 st.markdown("*🔒 Private & Secure • 🤖 Google Gemini Pro • 📱 Works on all devices*")
+
