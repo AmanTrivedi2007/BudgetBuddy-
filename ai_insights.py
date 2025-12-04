@@ -1,12 +1,10 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+import requests
 from datetime import datetime
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 import seaborn as sns
-import requests
+
 sns.set_style("whitegrid")
 
 from database import get_all_expenses
@@ -14,218 +12,206 @@ from auth import check_authentication
 
 st.set_page_config(page_title="AI Insights - BudgetBuddy", page_icon="🧠", layout="wide")
 
-# Securely load Google AI API key from Streamlit Secrets
+# Secure Google AI API from Streamlit Secrets
 try:
     GOOGLE_AI_API_KEY = st.secrets["GOOGLE_AI_API_KEY"]
     GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
-    AI_AVAILABLE = True
-except Exception:
-    AI_AVAILABLE = False
-    st.warning("🔑 Add your Google AI API key to Streamlit Secrets for full AI features!")
+    AI_READY = True
+except:
+    AI_READY = False
+    st.error("❌ **Add GOOGLE_AI_API_KEY to Streamlit Secrets!**")
 
-st.title("🧠 AI Budget Insights & Advisor")
-st.markdown("**ML Predictions + Smart Chat Assistant**")
+st.title("🤖 AI Budget Advisor")
+st.markdown("**Your Personal Finance Assistant - Powered by Google AI**")
 
 # Authentication
 username = check_authentication()
 if not username:
     st.stop()
 
-# Initialize session state for chat history
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-if 'ml_model_trained' not in st.session_state:
-    st.session_state.ml_model_trained = False
+# Chat history storage
+if 'ai_chat_history' not in st.session_state:
+    st.session_state.ai_chat_history = []
 
 @st.cache_data
-def load_user_data():
-    expenses_list = get_all_expenses(username)
-    if not expenses_list or len(expenses_list) == 0:
-        st.warning("👆 **Add 5+ expenses first** in Expense Tracker!")
+def load_user_spending_data():
+    """Load user's spending data for AI context"""
+    expenses = get_all_expenses(username)
+    if not expenses:
+        st.warning("👆 **Add expenses first** to get AI insights!")
         st.stop()
-    df = pd.DataFrame(expenses_list, columns=['id', 'category', 'amount', 'date', 'description'])
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    df = df.dropna(subset=['date'])
-    df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
-    df = df[df['amount'] > 0]
-    if df.empty:
-        st.warning("❌ No valid expense data found!")
-        st.stop()
+    
+    df = pd.DataFrame(expenses, columns=['id', 'category', 'amount', 'date', 'description'])
+    df['date'] = pd.to_datetime(df['date'])
+    df['amount'] = pd.to_numeric(df['amount'])
+    df = df.dropna()
+    
     return df
 
-def get_google_ai_response(prompt):
+def get_ai_insight(prompt, context=""):
+    """Call Google AI API with proper error handling"""
     headers = {"Content-Type": "application/json"}
     data = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "contents": [{"parts": [{"text": f"{context}\n\n{prompt}"}]}],
         "generationConfig": {
-            "temperature": 0.7,
+            "temperature": 0.8,
             "topK": 40,
             "topP": 0.95,
-            "maxOutputTokens": 300
+            "maxOutputTokens": 400
         }
     }
+    
     try:
-        response = requests.post(f"{GOOGLE_AI_URL}?key={GOOGLE_AI_API_KEY}", 
-                               headers=headers, json=data, timeout=10)
+        response = requests.post(
+            f"{GOOGLE_AI_URL}?key={GOOGLE_AI_API_KEY}",
+            headers=headers,
+            json=data,
+            timeout=15
+        )
+        
         if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        return "🔧 AI service temporarily unavailable. Try ML predictions!"
-    except:
-        return "💡 **Quick Tip**: Track daily expenses and set category budgets to save 20-30% monthly!"
+            result = response.json()
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"⚠️ API Error {response.status_code}. Check your API key!"
+            
+    except Exception as e:
+        return f"❌ Connection error: {str(e)}"
 
-df = load_user_data()
+# Load spending data
+df = load_user_spending_data()
 
-with st.expander("🔍 Preview Your Data", expanded=False):
-    st.dataframe(df.head(10), use_container_width=True)
+# Financial Summary
+col1, col2, col3, col4 = st.columns(4)
+total_spent = df['amount'].sum()
+avg_daily = df['amount'].mean()
+categories = df['category'].nunique()
+days_with_data = df['date'].nunique()
 
-col1, col2, col3 = st.columns(3)
 with col1:
-    total_spent = df['amount'].sum()
     st.metric("💰 Total Spent", f"₹{total_spent:,.0f}")
 with col2:
-    avg_monthly = df.groupby(df['date'].dt.to_period('M'))['amount'].sum().mean()
-    st.metric("📅 Avg Monthly", f"₹{avg_monthly:,.0f}")
+    st.metric("📊 Categories", categories)
 with col3:
-    top_cat = df.groupby('category')['amount'].sum().idxmax()
-    top_cat_amount = df.groupby('category')['amount'].sum().max()
-    st.metric("🔥 Top Category", f"{top_cat}")
+    st.metric("📅 Days Tracked", days_with_data)
+with col4:
+    st.metric("💵 Avg Daily", f"₹{avg_daily:.0f}")
 
+# Category breakdown pie chart
+st.subheader("📊 Your Spending Breakdown")
+category_totals = df.groupby('category')['amount'].sum().round(0)
+fig1, ax1 = plt.subplots(figsize=(10, 8))
+colors = plt.cm.Set3(range(len(category_totals)))
+wedges, texts, autotexts = ax1.pie(category_totals.values, labels=category_totals.index, 
+                                   autopct='%1.1f%%', startangle=90, colors=colors)
+ax1.set_title("Spending by Category", fontsize=16, fontweight='bold')
+plt.setp(autotexts, size=10, weight="bold")
+st.pyplot(fig1)
+
+# Recent spending trends
+st.subheader("📈 Recent Trends")
+monthly = df.groupby([df['date'].dt.to_period('M'), 'category'])['amount'].sum().unstack(fill_value=0)
+monthly['Total'] = monthly.sum(axis=1)
+recent_months = monthly.tail(6)
+st.dataframe(recent_months.T.round(0).style.format('₹{:.0f}'), use_container_width=True)
+
+# MAIN AI CHAT INTERFACE
 st.markdown("---")
-st.subheader("📈 Next Month Spending Predictions")
+st.markdown("### 💬 **Chat with Your AI Budget Advisor**")
+st.markdown("*Ask about saving money, budget tips, spending patterns, or analysis*")
 
-if st.button("🚀 Train AI Model & Predict", type="primary", use_container_width=True):
-    with st.spinner("🤖 Training ML model on YOUR data..."):
-        df_ml = df.copy()
-        df_ml['month'] = df_ml['date'].dt.month
-        df_ml['day_of_week'] = df_ml['date'].dt.dayofweek
-        
-        le = LabelEncoder()
-        df_ml['category_code'] = le.fit_transform(df_ml['category'])
-        
-        X = df_ml[['category_code', 'month', 'day_of_week']]
-        y = df_ml['amount']
-        
-        model = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=6)
-        model.fit(X, y)
-        
-        next_month = (datetime.now().month % 12) + 1
-        predictions = {}
-        for cat in df['category'].unique():
-            cat_code = le.transform([cat])[0]
-            pred = model.predict([[cat_code, next_month, 3]])[0]
-            predictions[cat] = max(0, pred)
-        
-        st.session_state.ml_model_trained = True
-        st.session_state.predictions = predictions
-        st.session_state.model_accuracy = model.score(X, y)
-        st.session_state.category_encoder = le
-        
-        pred_df = pd.DataFrame([
-            {'Category': cat, 'Predicted': amt, '% of Total': f"{amt/total_spent*100:.1f}%"}
-            for cat, amt in sorted(predictions.items(), key=lambda x: x[1], reverse=True)
-        ])
-        
-        st.success(f"✅ Model Accuracy: {st.session_state.model_accuracy:.1%}")
-        st.dataframe(pred_df.style.format({'Predicted': '₹{:.0f}'}), 
-                     use_container_width=True, height=350)
-        
-        top_pred = pred_df.iloc[0]
-        st.error(f"⚠️ {top_pred['Category']} is predicted to cost ₹{top_pred['Predicted']:,.0f} next month!")
-
-st.subheader("📊 Spending Trends")
-monthly_spending = df.groupby([df['date'].dt.to_period('M'), 'category'])['amount'].sum().reset_index()
-monthly_spending['date'] = monthly_spending['date'].astype(str)
-
-fig, ax = plt.subplots(figsize=(14, 7))
-top_categories = monthly_spending.groupby('category')['amount'].sum().nlargest(6).index
-colors = plt.cm.Set3(np.linspace(0, 1, len(top_categories)))
-for i, cat in enumerate(top_categories):
-    cat_data = monthly_spending[monthly_spending['category'] == cat]
-    ax.plot(cat_data['date'], cat_data['amount'], marker='o', linewidth=3, 
-            label=cat, color=colors[i], markersize=8)
-ax.set_title("Your Spending Evolution (Top Categories)", fontsize=16, fontweight='bold')
-ax.set_ylabel("Amount Spent (₹)", fontsize=12)
-ax.tick_params(axis='x', rotation=45)
-ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-ax.grid(True, alpha=0.3)
-plt.tight_layout()
-st.pyplot(fig)
-
-st.markdown("---")
-st.subheader("💬 AI Budget Advisor")
-
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-
-if st.button("💭 Clear Chat History", type="secondary"):
-    st.session_state.chat_history = []
-    st.experimental_rerun()
-
-prompt = st.chat_input("Ask about your budget, spending patterns, or get saving tips...")
-
-if prompt:
-    context = f"""
-User's financial data:
-- Total spent: ₹{total_spent:,.0f}
-- Average monthly: ₹{avg_monthly:,.0f}
-- Top category: {top_cat} (₹{top_cat_amount:,.0f})
-"""
-    if st.session_state.get('ml_model_trained', False):
-        context += f"\nNext month predictions: {st.session_state.predictions}"
-
-    full_prompt = f"{context}\n\nQ: {prompt}\nA:"
-
-    if AI_AVAILABLE:
+# Chat history display (last 12 messages)
+if st.session_state.ai_chat_history:
+    st.markdown("---")
+    for i, chat in enumerate(reversed(st.session_state.ai_chat_history[-12:])):
+        with st.chat_message("user"):
+            st.write(f"**You** ({chat.get('time', 'recent')})")
+            st.write(chat['question'])
         with st.chat_message("assistant"):
-            with st.spinner("AI thinking..."):
-                ai_response = get_google_ai_response(full_prompt)
-                st.markdown(ai_response)
-                st.session_state.chat_history.append({'user': prompt, 'ai': ai_response})
+            st.write(f"**AI Advisor** ({chat.get('time', 'recent')})")
+            st.markdown(chat['answer'])
+
+# Chat controls
+col_btn1, col_btn2 = st.columns([3, 1])
+with col_btn1:
+    user_question = st.chat_input("💭 Type your question (e.g., 'How can I save on food expenses?')", 
+                                 placeholder="Ask anything about your budget...")
+with col_btn2:
+    if st.button("🗑️ Clear History", type="secondary"):
+        st.session_state.ai_chat_history = []
+        st.rerun()
+
+# Send message to AI
+if user_question:
+    # Build rich financial context
+    top_category = df.groupby('category')['amount'].sum().idxmax()
+    top_amount = df.groupby('category')['amount'].sum().max()
+    
+    context = f"""
+**User Financial Profile:**
+• Total spent: ₹{total_spent:,.0f} 
+• Tracked {days_with_data} days across {categories} categories
+• Biggest spender: {top_category} (₹{top_amount:,.0f})
+• Average daily spend: ₹{avg_daily:.0f}
+
+**Recent monthly totals:**
+{recent_months['Total'].to_dict()}
+"""
+    
+    full_prompt = f"""
+You are a smart personal finance advisor for Indian users. 
+
+{context}
+
+**User asks:** {user_question}
+
+Give practical, actionable advice using ₹ symbol. Be encouraging and specific.
+Keep response under 200 words. Focus on savings opportunities.
+"""
+    
+    if AI_READY:
+        with st.chat_message("assistant"):
+            with st.spinner("🤖 AI analyzing your finances..."):
+                ai_answer = get_ai_insight(full_prompt)
+                st.markdown(ai_answer)
+                
+                # Save to chat history
+                st.session_state.ai_chat_history.append({
+                    'question': user_question,
+                    'answer': ai_answer,
+                    'time': datetime.now().strftime('%H:%M'),
+                    'total_spent': total_spent
+                })
+                st.rerun()
     else:
-        st.chat_message("assistant").markdown(
-            "🔑 **Add Google AI API key to Streamlit Secrets** to enable AI chat!"
-            "\nML predictions work without API."
-        )
+        st.error("❌ **AI UNAVAILABLE** - Add `GOOGLE_AI_API_KEY` to Streamlit Secrets!")
+        st.info("✅ **ML predictions & charts work without API!**")
 
-for chat in st.session_state.chat_history[-10:]:
-    with st.chat_message("user"):
-        st.markdown(chat['user'])
-    with st.chat_message("assistant"):
-        st.markdown(chat['ai'])
-
+# Quick AI prompts
 st.markdown("---")
+st.markdown("### 🚀 **Quick Questions**")
+quick_prompts = [
+    "How can I save money on my biggest expense?",
+    "What's my spending pattern like?",
+    "Give me 3 budget tips for this month",
+    "Should I cut spending in any category?",
+    "How much could I save next month?"
+]
 
+cols = st.columns(3)
+for i, prompt in enumerate(quick_prompts):
+    if cols[i%3].button(prompt, key=f"quick_{i}", use_container_width=True):
+        st.chat_input(prompt)
+        st.rerun()
+
+# Stats footer
+st.markdown("---")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("📊 Data Points", len(df))
+    st.metric("📊 Transactions", len(df))
 with col2:
-    if st.session_state.get('ml_model_trained', False):
-        st.metric("🎯 ML Accuracy", f"{st.session_state['model_accuracy']:.1%}")
+    st.metric("💬 AI Chats", len(st.session_state.ai_chat_history))
 with col3:
-    st.metric("💬 Chat Messages", len(st.session_state.chat_history))
+    st.metric("📈 Categories", df['category'].nunique())
 
-st.markdown(
-    "*🔒 Your data is private • 🤖 Powered by scikit-learn and Google AI Studio • "
-    "📈 Model accuracy adapts to your data*"
-)
-
-def get_google_ai_response(prompt):
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.7,
-            "topK": 40,
-            "topP": 0.95,
-            "maxOutputTokens": 300,
-        }
-    }
-    try:
-        response = requests.post(f"{GOOGLE_AI_URL}?key={GOOGLE_AI_API_KEY}",
-                                 headers=headers, json=data, timeout=10)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return "⚠️ AI service temporarily unavailable. Try again later!"
-    except Exception:
-        return "⚠️ Error contacting AI service."
+st.markdown("*🔒 Private & Secure • 🤖 Google Gemini Pro • 📱 Works on all devices*")
