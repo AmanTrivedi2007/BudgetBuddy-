@@ -6,7 +6,14 @@ from database import init_database
 from auth import check_authentication
 
 # Initialize database FIRST
-init_database()
+import os
+
+# Initialize DB only if missing (do NOT recreate every run)
+if not os.path.exists("budgetbuddy.db") and os.getenv('STREAMLIT_CLOUD') != 'true':
+    init_database()
+
+username = check_authentication()
+
 
 # Page configuration
 st.set_page_config(
@@ -48,10 +55,12 @@ page4 = st.Page("budget_manager.py", title="Budget Manager", icon="💰")
 page5 = st.Page("recurring_transactions.py", title="Recurring Transactions", icon="🔁")
 page6 = st.Page("Saving_goal.py", title="Savings Goals", icon="🎯")
 page7 = st.Page("visualization.py", title="Advanced Visualizations", icon="📊")
+page8 = st.Page("ai_insights.py", title="🤖 AI Insights", icon="🧠")
+  
 
 # Create navigation
 pg = st.navigation(
-    [page1, page2, page3, page4, page5, page6, page7],
+    [page1, page2, page3, page4, page5, page6, page7,page8],
     position="sidebar"
 )
 
