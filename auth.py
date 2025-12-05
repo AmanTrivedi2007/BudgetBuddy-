@@ -7,7 +7,9 @@ import re
 import secrets
 import time
 
-DB_FILE = "budgetbuddy.db"
+from persistent_storage import get_db_path
+DB_FILE = get_db_path()
+
 
 
 # ===== DATABASE FUNCTIONS =====
@@ -500,3 +502,4 @@ def check_authentication():
         st.caption("🔑 Password Reset: Username + Email verification")
     
     st.stop()
+
