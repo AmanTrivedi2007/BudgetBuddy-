@@ -8,14 +8,17 @@ from auth import check_authentication
 # Initialize database FIRST
 import os
 
-# Initialize DB only if missing (do NOT recreate every run)
+# TOP OF FILE - Add these imports
 import os
-from persistent_storage import get_db_path  # ✅ Add this import
+from persistent_storage import get_db_path
 
-# Initialize ONLY if missing
+# Replace OLD init_database() call with:
 if not os.path.exists(get_db_path()):
     from database import init_database
     init_database()
+
+
+
 
 
 
@@ -233,3 +236,4 @@ with st.sidebar:
 
 # Run the selected page
 pg.run()
+
