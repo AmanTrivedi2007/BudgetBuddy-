@@ -1125,5 +1125,4 @@ def delete_user_preference(user_id, preference_key):
 
 
 # Initialize database when module is imported
-
-
+init_database()
