@@ -1124,5 +1124,5 @@ def delete_user_preference(user_id, preference_key):
     return rows_affected > 0
 
 
-# Initialize database when module is imported
-init_database()
+
+
