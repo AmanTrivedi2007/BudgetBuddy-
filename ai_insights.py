@@ -1,39 +1,39 @@
 import streamlit as st
 import pandas as pd
-import requests
-from datetime import datetime
+import google.generativeai as genai
 import matplotlib.pyplot as plt
-import seaborn as sns
-
-sns.set_style("whitegrid")
+from datetime import datetime
 
 from database import get_all_expenses
 from auth import check_authentication
 
 st.set_page_config(page_title="AI Insights - BudgetBuddy", page_icon="🧠", layout="wide")
 
-# ✅ CORRECT Google AI Endpoint (FIXED 404)
+# ✅ Configure YOUR custom model from AI Studio
 try:
-    GOOGLE_AI_API_KEY = st.secrets["GOOGLE_AI_API_KEY"]
-    GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    API_KEY = st.secrets["GOOGLE_AI_API_KEY"]
+    genai.configure(api_key=API_KEY)
+    
+    # YOUR CUSTOM MODEL from AI Studio
+    model = genai.GenerativeModel('gen-lang-client-0670597071')
     AI_READY = True
-    st.success("✅ Google AI Connected!")
+    st.success("✅ Connected to YOUR custom AI model!")
 except:
     AI_READY = False
     st.error("❌ Add GOOGLE_AI_API_KEY to Streamlit Secrets!")
 
 st.title("🤖 AI Budget Advisor")
-st.markdown("**Powered by Google Gemini**")
+st.markdown("**Powered by YOUR Google AI Studio Model**")
 
 username = check_authentication()
 if not username:
     st.stop()
 
-if 'ai_chat_history' not in st.session_state:
-    st.session_state.ai_chat_history = []
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
 @st.cache_data
-def load_user_spending_data():
+def load_spending_data():
     expenses = get_all_expenses(username)
     if not expenses:
         st.warning("👆 Add expenses first!")
@@ -43,77 +43,58 @@ def load_user_spending_data():
     df['amount'] = pd.to_numeric(df['amount'])
     return df.dropna()
 
-def get_ai_insight(prompt):
-    """✅ WORKING Google AI Call"""
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 300
-        }
-    }
+def ask_ai(prompt):
+    """✅ Uses YOUR custom model"""
     try:
-        response = requests.post(
-            f"{GOOGLE_AI_URL}?key={GOOGLE_AI_API_KEY}",
-            headers=headers,
-            json=data,
-            timeout=15
-        )
-        if response.status_code == 200:
-            result = response.json()
-            return result['candidates'][0]['content']['parts'][0]['text']
-        return f"⚠️ HTTP {response.status_code}: {response.text[:100]}"
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        return f"❌ Network error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
-df = load_user_spending_data()
+df = load_spending_data()
 
 # Stats
 col1, col2, col3 = st.columns(3)
-total_spent = df['amount'].sum()
+total = df['amount'].sum()
 top_cat = df.groupby('category')['amount'].sum().idxmax()
-top_amount = df.groupby('category')['amount'].sum().max()
+top_amt = df.groupby('category')['amount'].sum().max()
 
-with col1: st.metric("💰 Total", f"₹{total_spent:,.0f}")
+with col1: st.metric("💰 Total", f"₹{total:,.0f}")
 with col2: st.metric("🔥 Top Category", top_cat)
 with col3: st.metric("📊 Transactions", len(df))
 
-# Pie Chart
-fig, ax = plt.subplots(figsize=(8, 6))
-category_totals = df.groupby('category')['amount'].sum()
-ax.pie(category_totals.values, labels=category_totals.index, autopct='%1.1f%%')
-ax.set_title("Spending Breakdown")
+# Pie chart
+st.subheader("📊 Spending Breakdown")
+totals = df.groupby('category')['amount'].sum()
+fig, ax = plt.subplots(figsize=(8,6))
+ax.pie(totals.values, labels=totals.index, autopct='%1.1f%%')
+ax.set_title("Category Spending")
 st.pyplot(fig)
 
-# AI CHAT
+# AI Chat
 st.markdown("---")
-st.subheader("💬 AI Budget Advisor")
+st.subheader("💬 Chat with YOUR AI Model")
 
-if st.session_state.ai_chat_history:
-    for chat in st.session_state.ai_chat_history[-6:]:
-        st.markdown(f"**You:** {chat['question']}")
-        st.markdown(f"**🤖 AI:** {chat['answer']}")
-        st.markdown("─" * 50)
+for chat in st.session_state.chat_history[-6:]:
+    st.markdown(f"**You:** {chat['q']}")
+    st.markdown(f"**🤖 AI:** {chat['a']}")
+    st.markdown("─" * 40)
 
-user_question = st.text_input("Ask about your budget...", key="ai_input")
-if st.button("🤖 Send to AI", type="primary") and user_question:
+question = st.text_input("Ask about your budget...", key="question")
+if st.button("🤖 Ask AI", type="primary") and question:
     if AI_READY:
-        context = f"Total spent ₹{total_spent:,.0f}. Top category {top_cat} ₹{top_amount:,.0f}. {len(df)} transactions."
-        prompt = f"Indian finance expert. {context}\nUser: {user_question}\nAnswer:"
+        context = f"Total spent ₹{total:,.0f}. Top category {top_cat} ₹{top_amt:,.0f}."
+        prompt = f"Indian finance expert. {context}\nQ: {question}\nA:"
         
-        with st.spinner("AI responding..."):
-            answer = get_ai_insight(prompt)
-            st.session_state.ai_chat_history.append({
-                'question': user_question,
-                'answer': answer
-            })
+        with st.spinner("AI thinking..."):
+            answer = ask_ai(prompt)
+            st.session_state.chat_history.append({"q": question, "a": answer})
             st.rerun()
     else:
-        st.error("❌ API Key Missing!")
+        st.error("❌ API Key missing!")
 
 if st.button("🗑️ Clear Chat"):
-    st.session_state.ai_chat_history = []
+    st.session_state.chat_history = []
     st.rerun()
 
-st.markdown("*✅ Google Gemini 1.5 Flash • 🔒 Secure API Key*")
+st.markdown("*✅ YOUR custom model: gen-lang-client-0670597071 • 🔒 Secure*")
