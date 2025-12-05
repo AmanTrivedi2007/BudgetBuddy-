@@ -11,7 +11,10 @@ import calendar
 import json
 
 # Database file name
-DB_FILE = "budgetbuddy.db"
+from persistent_storage import get_db_path
+DB_FILE = get_db_path()
+
+
 
 # ========================================
 # DATABASE INITIALIZATION (FIXED - NO AUTO-DELETION)
