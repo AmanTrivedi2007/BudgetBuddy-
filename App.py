@@ -8,15 +8,17 @@ from auth import check_authentication
 # Initialize database FIRST
 import os
 
+# Initialize DB only if missing (do NOT recreate every run)
 import os
-from persistent_storage import get_db_path
+from persistent_storage import get_db_path  # ✅ Add this import
 
-# Safe DB initialization
-db_path = get_db_path()
-if not os.path.exists(db_path):
+# Initialize ONLY if missing
+if not os.path.exists(get_db_path()):
     from database import init_database
     init_database()
-    print(f"✅ Created new DB at: {db_path}")
+
+
+
 
 
 username = check_authentication()
@@ -231,5 +233,3 @@ with st.sidebar:
 
 # Run the selected page
 pg.run()
-
-
