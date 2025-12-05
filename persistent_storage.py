@@ -7,14 +7,12 @@ def get_db_path():
     is_cloud = (
         os.getenv('STREAMLIT_CLOUD_APP') or
         os.getenv('STREAMLIT_CLOUD') == 'true' or
-        os.path.exists('/mnt') or
-        os.path.exists('/mnt/data')
+        os.path.exists('/mount/src') or  # ✅ Updated for actual Streamlit Cloud path
+        os.path.exists('/mnt')
     )
     
     if is_cloud:
-        db_path = "/mnt/data/budgetbuddy.db"
-        # Auto-create directory if missing
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        db_path = "/mount/src/budgetbuddy.db"  # ✅ Fixed path - no subdirectories
         print(f"🔄 Using Cloud persistent DB: {db_path}")
         return db_path
     
