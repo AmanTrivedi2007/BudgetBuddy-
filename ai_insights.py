@@ -15,7 +15,7 @@ try:
     genai.configure(api_key=API_KEY)
     
     # YOUR CUSTOM MODEL from AI Studio
-    model = genai.GenerativeModel('gen-lang-client-0670597071')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     AI_READY = True
     st.success("✅ Connected to YOUR custom AI model!")
 except:
