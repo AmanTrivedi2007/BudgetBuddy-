@@ -9,8 +9,17 @@ from auth import check_authentication
 import os
 
 # Initialize DB only if missing (do NOT recreate every run)
-if not os.path.exists("budgetbuddy.db") and os.getenv('STREAMLIT_CLOUD') != 'true':
+import os
+from persistent_storage import get_db_path  # ✅ Add this import
+
+# Initialize ONLY if missing
+if not os.path.exists(get_db_path()):
+    from database import init_database
     init_database()
+
+
+
+
 
 username = check_authentication()
 
